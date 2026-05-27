@@ -13,21 +13,23 @@ A full-stack web-based appointment scheduling system designed to eliminate manua
 
 | Problem | Solution |
 |---|---|
-| Long queues & walk-in chaos | Online + kiosk scheduling |
-| Overlapping appointments | Automated conflict detection engine |
-| Identity fraud / impersonation | Fingerprint biometric verification |
-| Lost paper records | Digital appointment ledger |
-| No-show inefficiency | SMS/notification reminders |
+|| Long queues & walk-in chaos | **Online appointment scheduling** — book from home |
+|| Overlapping appointments | Automated conflict detection engine |
+|| Identity fraud / impersonation | Fingerprint biometric verification at kiosk |
+|| Lost paper records | Digital appointment ledger |
+|| No-show inefficiency | SMS/notification reminders |
+|| Manual queuing at the hall | Online pre-scheduling → fingerprint confirmation on arrival |
 
 ---
 
 ## 🎯 Core Features
 
-### 1. Web-Based Appointment Portal
-- **Resident-facing website** — Book, reschedule, or cancel appointments online
+### 1. Online Appointment Scheduling
+- **Resident-facing web portal** — Book, reschedule, or cancel appointments online from home or mobile
 - **Service catalog** — Browse available barangay services (certificates, clearances, ID applications, etc.)
 - **Real-time slot availability** — See open time slots before booking
 - **Multi-step booking wizard** — Select service → pick date/time → provide details → confirm
+- **Reference number & QR code** — Sent to user after booking; used for kiosk check-in
 - **Responsive design** — Works on mobile phones, tablets, and desktops
 
 ### 2. Automated Conflict Detection Engine
@@ -39,7 +41,11 @@ A full-stack web-based appointment scheduling system designed to eliminate manua
 ### 3. Fingerprint Authentication Kiosk
 - **Self-service kiosk mode** — Touchscreen + fingerprint scanner at the barangay hall
 - **Fingerprint enrollment** — First-time residents register their fingerprint + ID
-- **Check-in verification** — Scan fingerprint upon arrival to confirm identity
+- **Check-in verification** — Scan fingerprint upon arrival → system looks up today's appointment → marks as arrived
+- **Appointment confirmation flow**:
+  - *Matched + has appointment →* "Welcome! Your 9AM appointment is confirmed."
+  - *Matched + no appointment →* "No appointment today. Walk-in?"
+  - *Not matched →* "Fingerprint not recognized. Please see the front desk."
 - **Admin override** — PIN-based fallback for fingerprint failure
 - **Offline fallback** — Cached templates for when internet is down
 
@@ -70,25 +76,37 @@ The ESP32 runs firmware that handles fingerprint enrollment and verification dir
 ## 🏗️ System Architecture
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                   Frontend (Web)                      │
-│     React + Tailwind CSS + PWA (mobile-ready)         │
-└──────────────────────┬───────────────────────────────┘
-                       │ HTTP / WebSocket
-┌──────────────────────▼───────────────────────────────┐
-│                    API Server                          │
-│                  FastAPI (Python)                      │
-└─────┬────────────────────┬─────────────────┬─────────┘
-      │                    │                 │
-┌─────▼──────┐   ┌────────▼───────┐   ┌────▼────────┐
-│  Database   │   │  Kiosk (RPi4)  │   │  SMS/Notify  │
-│  PostgreSQL │   │  Touchscreen   │   │  (Twilio)    │
-│  + Redis    │   │       │        │   │              │
-└─────────────┘   │  ┌────▼────┐  │   └─────────────┘
-                  │  │ ESP32   │  │
-                  │  │ + AS608 │  │
-                  │  └─────────┘  │
-                  └───────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                  RESIDENT (at home)                         │
+│     [Web Browser / Mobile] — books appointment online       │
+└──────────────────────┬─────────────────────────────────────┘
+                       │ HTTP
+┌──────────────────────▼─────────────────────────────────────┐
+│               ONLINE SCHEDULING PORTAL                       │
+│  (React + Tailwind CSS + PWA — mobile-friendly)              │
+│  ● Browse services ● Pick date/time ● Get reference #/QR    │
+└──────────────────────┬─────────────────────────────────────┘
+                       │ syncs appointments
+┌──────────────────────▼─────────────────────────────────────┐
+│                     RESIDENT (at hall)                       │
+│     Places finger on AS608 scanner at the kiosk             │
+└──────────────────────┬─────────────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────────────┐
+│                    API SERVER                                │
+│                  FastAPI (Python)                            │
+├─────────┬─────────────────────┬────────────────┬────────────┤
+│         │                     │                │            │
+│  ┌──────▼──────┐   ┌─────────▼────────┐  ┌────▼───────┐   │
+│  │  Database    │   │  Kiosk (RPi4)   │  │  SMS/Notify │   │
+│  │  PostgreSQL  │   │  Touchscreen    │  │  (Twilio)   │   │
+│  │  + Redis     │   │        │        │  │             │   │
+│  └─────────────┘   │  ┌─────▼─────┐  │  └─────────────┘   │
+│                    │  │  ESP32    │  │                     │
+│                    │  │  + AS608  │  │                     │
+│                    │  └───────────┘  │                     │
+│                    └─────────────────┘                     │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ### Technology Stack (Proposed)
@@ -267,8 +285,8 @@ notifications
 
 | User | Interaction |
 |---|---|
-| **Resident** | Books appointments via web or walks in to use the kiosk |
-| **Barangay Staff (Encoder)** | Manages services, slots, resident records |
+| **Resident** | Books appointments online via web/mobile; confirms arrival via fingerprint at kiosk |
+|| **Barangay Staff (Encoder)** | Manages services, slots, resident records |
 | **Barangay Staff (Verifier)** | Oversees kiosk check-in, handles exceptions |
 | **Administrator** | Full system control, reports, user roles |
 | **System Admin** | Maintenance, backups, security |
@@ -304,6 +322,58 @@ python main.py     # GUI kiosk app — communicates with ESP32 over /dev/ttyUSB0
 # Flash ESP32 firmware (separate terminal)
 cd firmware/fingerprint_controller
 platformio run --target upload
+```
+
+---
+
+## 🔄 Complete User Journey (Online + Kiosk)
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  PHASE 1: ONLINE BOOKING (from home / mobile)             │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  1. Resident visits the scheduling website                │
+│  2. Browses available barangay services                   │
+│  3. Picks a date + time slot (real-time availability)     │
+│  4. Fills in personal details                             │
+│  5. Receives confirmation: Reference # + QR Code          │
+│  6. Appointment stored as "scheduled" in the database     │
+│                                                           │
+└──────────────────────────┬───────────────────────────────┘
+                           │
+┌──────────────────────────▼───────────────────────────────┐
+│  PHASE 2: KIOSK CHECK-IN (arrival at barangay hall)       │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  7. Resident walks up to the kiosk                        │
+│  8. Places finger on the AS608 fingerprint scanner        │
+│  9. ESP32 reads fingerprint → sends to AS608 for matching │
+│ 10. AS608 returns template ID (or "no match")             │
+│ 11. RPi4 backend receives the match result                │
+│                                                           │
+│  ┌─ CASE A: Fingerprint matched + has appointment ──┐    │
+│  │  "Good morning, Juan! Your 9AM appointment for   │    │
+│  │  Barangay Clearance is confirmed. Please proceed │    │
+│  │  to Window 2."                                   │    │
+│  │  → Status updated to "checked_in"                │    │
+│  │  → Arrival timestamp recorded                    │    │
+│  │  → Staff notified (queue board updates)          │    │
+│  └──────────────────────────────────────────────────┘    │
+│                                                           │
+│  ┌─ CASE B: Fingerprint matched but NO appointment ──┐   │
+│  │  "You have no appointment scheduled today. Would  │   │
+│  │  you like to register as a walk-in?"              │   │
+│  │  → Optional walk-in flow                          │   │
+│  └──────────────────────────────────────────────────┘   │
+│                                                           │
+│  ┌─ CASE C: Fingerprint not recognized ─────────────┐    │
+│  │  "Fingerprint not recognized. Please see the     │    │
+│  │  front desk to register your fingerprint."       │    │
+│  │  → Staff-assisted enrollment                     │    │
+│  └──────────────────────────────────────────────────┘    │
+│                                                           │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
