@@ -229,44 +229,42 @@ notifications
 
 ---
 
-## Development Phases
+## Development Timeline
 
-### Phase 1 — Foundation (Weeks 1–3)
-- [ ] Set up project scaffolding (frontend + backend)
-- [ ] Configure PostgreSQL schema & Alembic migrations
-- [ ] Implement basic user/resident CRUD endpoints
-- [ ] Build service catalog API + UI
-- [ ] Deploy Docker Compose dev environment
+> **Deadline: June 24, 2026** — 4 weeks (May 27 → June 24)
 
-### Phase 2 — Appointment Engine (Weeks 4–6)
-- [ ] Build conflict detection algorithm
-- [ ] Implement appointment booking API (create, reschedule, cancel)
-- [ ] Slot availability calendar component (frontend)
-- [ ] Booking wizard UI
-- [ ] Admin queue board (real-time view)
-- [ ] Unit tests for conflict detection edge cases
+### Week 1 — Core Backend + Database (May 27 – Jun 2)
+- [ ] Set up FastAPI project scaffolding & Docker Compose
+- [ ] Define PostgreSQL schema: residents, services, appointments, time_slots, notifications
+- [ ] Alembic migrations & seed data
+- [ ] Resident CRUD API endpoints
+- [ ] Service catalog API endpoints
+- [ ] Basic backend deployment
 
-### Phase 3 — Fingerprint Kiosk (Weeks 7–9)
-- [ ] Integrate fingerprint SDK (enrollment + verification)
-- [ ] Build kiosk UI (touchscreen-friendly)
-- [ ] Kiosk check-in flow (scan → verify → mark arrived)
-- [ ] Offline mode for kiosk (local cache)
-- [ ] Admin override PIN flow
-- [ ] Test with actual fingerprint hardware
+### Week 2 — Appointment Engine + Frontend (Jun 3 – Jun 9)
+- [ ] Conflict detection algorithm (no double-booking, grace periods)
+- [ ] Appointment booking API (create, reschedule, cancel)
+- [ ] Admin queue board API (today's schedule, status updates)
+- [ ] React frontend scaffolding (routing, auth, layout)
+- [ ] Service catalog page + booking wizard (pick service → date/time → confirm)
+- [ ] Real-time slot availability display
 
-### Phase 4 — Notifications & Polish (Weeks 10–11)
-- [ ] SMS reminder system (Twilio / Semaphore)
-- [ ] Queue number SMS alerts
-- [ ] Dashboard analytics & charts
-- [ ] Error handling & edge cases
-- [ ] Performance optimization
+### Week 3 — Kiosk + Fingerprint Integration (Jun 10 – Jun 16)
+- [ ] ESP32 firmware: UART command handler, enroll & verify commands
+- [ ] RPi4 serial handler (communicate with ESP32)
+- [ ] Kiosk UI (touchscreen): home screen, fingerprint prompt, confirmation display
+- [ ] Kiosk check-in flow: scan → match → look up appointment → mark arrived
+- [ ] Fingerprint enrollment flow (kiosk)
+- [ ] 3-case response logic (has appointment / no appointment / not recognized)
 
-### Phase 5 — Deployment (Week 12)
-- [ ] Security audit (biometric data encryption)
-- [ ] Barangay server setup (local + cloud backup)
+### Week 4 — Polish, Testing & Deployment (Jun 17 – Jun 24)
+- [ ] QR code generation for booking confirmations
+- [ ] SMS reminders (Twilio/Semaphore)
+- [ ] Admin dashboard: queue board, reporting, resident directory
+- [ ] Security: biometric data encryption, TLS, rate limiting, RBAC
 - [ ] Staff training & documentation
-- [ ] Pilot run with barangay staff
-- [ ] Go-live
+- [ ] Pilot run + bug fixes
+- [ ] Go-live — June 24
 
 ---
 
