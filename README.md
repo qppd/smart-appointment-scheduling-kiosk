@@ -1,11 +1,11 @@
-# Smart Appointment Scheduling Kiosk 🏛️
+# Smart Appointment Scheduling Kiosk
 
 > **Web-Based Appointment Scheduling System with Automated Conflict Detection and Fingerprint Authentication Kiosk**
 > *Barangay Dolores, Taytay, Rizal*
 
 ---
 
-## 📋 Project Overview
+## Project Overview
 
 A full-stack web-based appointment scheduling system designed to eliminate manual queuing and improve service efficiency at **Barangay Dolores, Taytay, Rizal**. The system integrates **automated conflict detection** (no double-booking) and a **fingerprint authentication kiosk** for secure identity verification.
 
@@ -22,7 +22,7 @@ A full-stack web-based appointment scheduling system designed to eliminate manua
 
 ---
 
-## 🎯 Core Features
+## Core Features
 
 ### 1. Online Appointment Scheduling
 - **Resident-facing web portal** — Book, reschedule, or cancel appointments online from home or mobile
@@ -43,9 +43,9 @@ A full-stack web-based appointment scheduling system designed to eliminate manua
 - **Fingerprint enrollment** — First-time residents register their fingerprint + ID
 - **Check-in verification** — Scan fingerprint upon arrival → system looks up today's appointment → marks as arrived
 - **Appointment confirmation flow**:
-  - *Matched + has appointment →* "Welcome! Your 9AM appointment is confirmed."
-  - *Matched + no appointment →* "No appointment today. Walk-in?"
-  - *Not matched →* "Fingerprint not recognized. Please see the front desk."
+ - *Matched + has appointment →* "Welcome! Your 9AM appointment is confirmed."
+ - *Matched + no appointment →* "No appointment today. Walk-in?"
+ - *Not matched →* "Fingerprint not recognized. Please see the front desk."
 - **Admin override** — PIN-based fallback for fingerprint failure
 - **Offline fallback** — Cached templates for when internet is down
 
@@ -73,40 +73,40 @@ The ESP32 runs firmware that handles fingerprint enrollment and verification dir
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                  RESIDENT (at home)                         │
-│     [Web Browser / Mobile] — books appointment online       │
-└──────────────────────┬─────────────────────────────────────┘
-                       │ HTTP
-┌──────────────────────▼─────────────────────────────────────┐
-│               ONLINE SCHEDULING PORTAL                       │
-│  (React + Tailwind CSS + PWA — mobile-friendly)              │
-│  ● Browse services ● Pick date/time ● Get reference #/QR    │
-└──────────────────────┬─────────────────────────────────────┘
-                       │ syncs appointments
-┌──────────────────────▼─────────────────────────────────────┐
-│                     RESIDENT (at hall)                       │
-│     Places finger on AS608 scanner at the kiosk             │
-└──────────────────────┬─────────────────────────────────────┘
-                       │
-┌──────────────────────▼─────────────────────────────────────┐
-│                    API SERVER                                │
-│                  FastAPI (Python)                            │
-├─────────┬─────────────────────┬────────────────┬────────────┤
-│         │                     │                │            │
-│  ┌──────▼──────┐   ┌─────────▼────────┐  ┌────▼───────┐   │
-│  │  Database    │   │  Kiosk (RPi4)   │  │  SMS/Notify │   │
-│  │  PostgreSQL  │   │  Touchscreen    │  │  (Twilio)   │   │
-│  │  + Redis     │   │        │        │  │             │   │
-│  └─────────────┘   │  ┌─────▼─────┐  │  └─────────────┘   │
-│                    │  │  ESP32    │  │                     │
-│                    │  │  + AS608  │  │                     │
-│                    │  └───────────┘  │                     │
-│                    └─────────────────┘                     │
-└────────────────────────────────────────────────────────────┘
+
+ RESIDENT (at home)
+ [Web Browser / Mobile] — books appointment online
+
+ HTTP
+
+ ONLINE SCHEDULING PORTAL
+ (React + Tailwind CSS + PWA — mobile-friendly)
+ Browse services Pick date/time Get reference #/QR
+
+ syncs appointments
+
+ RESIDENT (at hall)
+ Places finger on AS608 scanner at the kiosk
+
+
+
+ API SERVER
+ FastAPI (Python)
+
+
+
+ Database Kiosk (RPi4) SMS/Notify
+ PostgreSQL Touchscreen (Twilio)
+ + Redis
+
+ ESP32
+ + AS608
+
+
+
 ```
 
 ### Technology Stack (Proposed)
@@ -123,113 +123,113 @@ The ESP32 runs firmware that handles fingerprint enrollment and verification dir
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 smart-appointment-scheduling-kiosk/
-├── frontend/                 # React web app
-│   ├── public/
-│   ├── src/
-│   │   ├── components/       # Reusable UI components
-│   │   ├── pages/            # Page views (Booking, Queue, Dashboard)
-│   │   ├── services/         # API client & auth hooks
-│   │   ├── store/            # State management (Zustand)
-│   │   └── utils/            # Helpers & formatters
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/                  # FastAPI backend
-│   ├── app/
-│   │   ├── api/              # Route handlers
-│   │   ├── models/           # SQLAlchemy models
-│   │   ├── schemas/          # Pydantic schemas
-│   │   ├── services/         # Business logic
-│   │   │   ├── conflict_detection.py  # Conflict engine
-│   │   │   ├── fingerprint_service.py # Biometric logic
-│   │   │   └── notification_service.py
-│   │   ├── core/             # Config, security, DB
-│   │   └── main.py
-│   ├── alembic/              # DB migrations
-│   ├── requirements.txt
-│   └── Dockerfile
-├── kiosk/                    # Kiosk client app (RPi4)
-│   ├── main.py               # Kiosk entry point
-│   ├── serial_handler.py     # Communication with ESP32 over UART
-│   ├── ui/                   # Touchscreen UI (Tkinter / PyQt)
-│   └── config.yaml
-├── firmware/                 # ESP32 firmware source
-│   ├── fingerprint_controller/   # Arduino/PlatformIO project
-│   │   ├── src/
-│   │   │   └── main.cpp      # UART command handler + AS608 driver
-│   │   ├── lib/
-│   │   │   └── Adafruit_Fingerprint/  # AS608 library
-│   │   ├── platformio.ini
-│   │   └── README.md
-│   └── uart_protocol.md      # Command protocol spec (RPi4 ↔ ESP32)
-├── docs/                     # Documentation
-│   ├── api-spec.md
-│   ├── database-schema.md
-│   └── setup-guide.md
-├── docker-compose.yml
-├── .env.example
-└── README.md
+ frontend/ # React web app
+ public/
+ src/
+ components/ # Reusable UI components
+ pages/ # Page views (Booking, Queue, Dashboard)
+ services/ # API client & auth hooks
+ store/ # State management (Zustand)
+ utils/ # Helpers & formatters
+ package.json
+ vite.config.ts
+ backend/ # FastAPI backend
+ app/
+ api/ # Route handlers
+ models/ # SQLAlchemy models
+ schemas/ # Pydantic schemas
+ services/ # Business logic
+ conflict_detection.py # Conflict engine
+ fingerprint_service.py # Biometric logic
+ notification_service.py
+ core/ # Config, security, DB
+ main.py
+ alembic/ # DB migrations
+ requirements.txt
+ Dockerfile
+ kiosk/ # Kiosk client app (RPi4)
+ main.py # Kiosk entry point
+ serial_handler.py # Communication with ESP32 over UART
+ ui/ # Touchscreen UI (Tkinter / PyQt)
+ config.yaml
+ firmware/ # ESP32 firmware source
+ fingerprint_controller/ # Arduino/PlatformIO project
+ src/
+ main.cpp # UART command handler + AS608 driver
+ lib/
+ Adafruit_Fingerprint/ # AS608 library
+ platformio.ini
+ README.md
+ uart_protocol.md # Command protocol spec (RPi4 ↔ ESP32)
+ docs/ # Documentation
+ api-spec.md
+ database-schema.md
+ setup-guide.md
+ docker-compose.yml
+ .env.example
+ README.md
 ```
 
 ---
 
-## 🗄️ Database Schema (High-Level)
+## Database Schema (High-Level)
 
 ```
 residents
-  ├── id (PK)
-  ├── first_name, last_name, middle_name
-  ├── birth_date, contact_number, address
-  ├── fingerprint_template (BLOB)  — encrypted
-  ├── fingerprint_registered_at
-  └── created_at
+ id (PK)
+ first_name, last_name, middle_name
+ birth_date, contact_number, address
+ fingerprint_template (BLOB) — encrypted
+ fingerprint_registered_at
+ created_at
 
 services
-  ├── id (PK)
-  ├── name         — e.g. "Barangay Clearance"
-  ├── description
-  ├── duration_minutes
-  ├── slot_capacity_per_day
-  ├── is_active
-  └── department
+ id (PK)
+ name — e.g. "Barangay Clearance"
+ description
+ duration_minutes
+ slot_capacity_per_day
+ is_active
+ department
 
 appointments
-  ├── id (PK)
-  ├── resident_id (FK → residents)
-  ├── service_id (FK → services)
-  ├── appointment_date
-  ├── start_time
-  ├── end_time
-  ├── status       — scheduled | confirmed | checked_in | completed | cancelled | no_show
-  ├── queue_number
-  ├── notes
-  ├── verified_by_fingerprint (boolean)
-  └── created_at
+ id (PK)
+ resident_id (FK → residents)
+ service_id (FK → services)
+ appointment_date
+ start_time
+ end_time
+ status — scheduled | confirmed | checked_in | completed | cancelled | no_show
+ queue_number
+ notes
+ verified_by_fingerprint (boolean)
+ created_at
 
 time_slots
-  ├── id (PK)
-  ├── service_id (FK)
-  ├── date
-  ├── start_time
-  ├── end_time
-  ├── is_available (boolean)
-  └── version (for optimistic locking / conflict detection)
+ id (PK)
+ service_id (FK)
+ date
+ start_time
+ end_time
+ is_available (boolean)
+ version (for optimistic locking / conflict detection)
 
 notifications
-  ├── id (PK)
-  ├── appointment_id (FK)
-  ├── type          — reminder | confirmation | alert
-  ├── channel       — sms | email
-  ├── sent_at
-  └── status
+ id (PK)
+ appointment_id (FK)
+ type — reminder | confirmation | alert
+ channel — sms | email
+ sent_at
+ status
 ```
 
 ---
 
-## 📅 Development Phases
+## Development Phases
 
 ### Phase 1 — Foundation (Weeks 1–3)
 - [ ] Set up project scaffolding (frontend + backend)
@@ -270,7 +270,7 @@ notifications
 
 ---
 
-## 🔐 Security Considerations
+## Security Considerations
 
 - **Biometric data** — Fingerprint templates encrypted at rest (AES-256); never stored as raw images
 - **TLS everywhere** — HTTPS enforced for web & API traffic
@@ -281,7 +281,7 @@ notifications
 
 ---
 
-## 👥 Target Users
+## Target Users
 
 | User | Interaction |
 |---|---|
@@ -293,7 +293,7 @@ notifications
 
 ---
 
-## 🚀 Getting Started (Dev Setup)
+## Getting Started (Dev Setup)
 
 ```bash
 # Clone the repo
@@ -305,7 +305,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp ../.env.example .env  # Configure your database URL etc.
+cp ../.env.example .env # Configure your database URL etc.
 alembic upgrade head
 uvicorn app.main:app --reload
 
@@ -317,7 +317,7 @@ npm run dev
 # Kiosk setup (on the Raspberry Pi 4 + ESP32)
 cd kiosk
 pip install -r requirements.txt
-python main.py     # GUI kiosk app — communicates with ESP32 over /dev/ttyUSB0
+python main.py # GUI kiosk app — communicates with ESP32 over /dev/ttyUSB0
 
 # Flash ESP32 firmware (separate terminal)
 cd firmware/fingerprint_controller
@@ -326,62 +326,62 @@ platformio run --target upload
 
 ---
 
-## 🔄 Complete User Journey (Online + Kiosk)
+## Complete User Journey (Online + Kiosk)
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  PHASE 1: ONLINE BOOKING (from home / mobile)             │
-├──────────────────────────────────────────────────────────┤
-│                                                           │
-│  1. Resident visits the scheduling website                │
-│  2. Browses available barangay services                   │
-│  3. Picks a date + time slot (real-time availability)     │
-│  4. Fills in personal details                             │
-│  5. Receives confirmation: Reference # + QR Code          │
-│  6. Appointment stored as "scheduled" in the database     │
-│                                                           │
-└──────────────────────────┬───────────────────────────────┘
-                           │
-┌──────────────────────────▼───────────────────────────────┐
-│  PHASE 2: KIOSK CHECK-IN (arrival at barangay hall)       │
-├──────────────────────────────────────────────────────────┤
-│                                                           │
-│  7. Resident walks up to the kiosk                        │
-│  8. Places finger on the AS608 fingerprint scanner        │
-│  9. ESP32 reads fingerprint → sends to AS608 for matching │
-│ 10. AS608 returns template ID (or "no match")             │
-│ 11. RPi4 backend receives the match result                │
-│                                                           │
-│  ┌─ CASE A: Fingerprint matched + has appointment ──┐    │
-│  │  "Good morning, Juan! Your 9AM appointment for   │    │
-│  │  Barangay Clearance is confirmed. Please proceed │    │
-│  │  to Window 2."                                   │    │
-│  │  → Status updated to "checked_in"                │    │
-│  │  → Arrival timestamp recorded                    │    │
-│  │  → Staff notified (queue board updates)          │    │
-│  └──────────────────────────────────────────────────┘    │
-│                                                           │
-│  ┌─ CASE B: Fingerprint matched but NO appointment ──┐   │
-│  │  "You have no appointment scheduled today. Would  │   │
-│  │  you like to register as a walk-in?"              │   │
-│  │  → Optional walk-in flow                          │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                           │
-│  ┌─ CASE C: Fingerprint not recognized ─────────────┐    │
-│  │  "Fingerprint not recognized. Please see the     │    │
-│  │  front desk to register your fingerprint."       │    │
-│  │  → Staff-assisted enrollment                     │    │
-│  └──────────────────────────────────────────────────┘    │
-│                                                           │
-└──────────────────────────────────────────────────────────┘
+
+ PHASE 1: ONLINE BOOKING (from home / mobile)
+
+
+ 1. Resident visits the scheduling website
+ 2. Browses available barangay services
+ 3. Picks a date + time slot (real-time availability)
+ 4. Fills in personal details
+ 5. Receives confirmation: Reference # + QR Code
+ 6. Appointment stored as "scheduled" in the database
+
+
+
+
+ PHASE 2: KIOSK CHECK-IN (arrival at barangay hall)
+
+
+ 7. Resident walks up to the kiosk
+ 8. Places finger on the AS608 fingerprint scanner
+ 9. ESP32 reads fingerprint → sends to AS608 for matching
+ 10. AS608 returns template ID (or "no match")
+ 11. RPi4 backend receives the match result
+
+ CASE A: Fingerprint matched + has appointment
+ "Good morning, Juan! Your 9AM appointment for
+ Barangay Clearance is confirmed. Please proceed
+ to Window 2."
+ → Status updated to "checked_in"
+ → Arrival timestamp recorded
+ → Staff notified (queue board updates)
+
+
+ CASE B: Fingerprint matched but NO appointment
+ "You have no appointment scheduled today. Would
+ you like to register as a walk-in?"
+ → Optional walk-in flow
+
+
+ CASE C: Fingerprint not recognized
+ "Fingerprint not recognized. Please see the
+ front desk to register your fingerprint."
+ → Staff-assisted enrollment
+
+
+
 ```
 
 ---
 
-## 📄 License
+## License
 
 MIT License — See `LICENSE` for details.
 
 ---
 
-*Developed for Barangay Dolores, Taytay, Rizal — improving public service delivery through technology.* 🇵🇭
+*Developed for Barangay Dolores, Taytay, Rizal — improving public service delivery through technology.* 
