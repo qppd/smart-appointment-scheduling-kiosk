@@ -15,9 +15,7 @@ smart-appointment-scheduling-kiosk/
       services/     # API client, serial handler
       ui/           # Touchscreen UI screens
     esp/            # ESP32 firmware
-      fingerprint_controller/
-        src/main.cpp
-        platformio.ini
+      fingerprint_controller.ino
   docs/
     setup/          # Setup guides
     api/            # API documentation
@@ -82,6 +80,6 @@ cd src/web/frontend
 npm test
 
 # ESP32
-cd src/esp/fingerprint_controller
-platformio test -e esp32dev
+# Upload via Arduino IDE, then test with Serial Monitor at 115200 baud
+# See src/esp/README.md for detailed instructions
 ```

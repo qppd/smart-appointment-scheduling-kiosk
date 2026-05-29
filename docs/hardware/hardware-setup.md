@@ -66,7 +66,7 @@ sudo reboot
 ### Fingerprint sensor not detected
 - Check wiring: AS608 VCC to 3.3V (NOT 5V)
 - Ensure baud rate matches: AS608 default is 57600
-- Run PlatformIO monitor to see debug output
+- Open Arduino IDE Serial Monitor (Tools > Serial Monitor) at 115200 baud to see debug output
 
 ### Serial communication issues
 - Verify UART is enabled on RPi4

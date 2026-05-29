@@ -6,7 +6,7 @@
 - Python 3.12+
 - PostgreSQL 16+
 - Redis 7+ (optional, for caching)
-- PlatformIO CLI (for ESP32 firmware)
+|- Arduino IDE 2.x (for ESP32 firmware)
 - Raspberry Pi 4 with Raspberry Pi OS Lite (for kiosk)
 
 ## 1. Backend Setup
@@ -61,20 +61,20 @@ docker-compose up -d
 # Frontend runs at http://localhost:5173
 ```
 
-## 4. ESP32 Firmware
+## 4. ESP32 Firmware (Arduino IDE)
 
-```bash
-cd src/esp/fingerprint_controller
+1. Open **Arduino IDE 2.x**
+2. Add ESP32 board support: **File > Preferences** > paste `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json` into **Additional Boards Manager URLs**
+3. Install board support: **Tools > Board > Boards Manager** > search "ESP32" > install by Espressif
+4. Install libraries: **Tools > Manage Libraries** > search and install:
+   - **Adafruit Fingerprint Sensor Library**
+   - **Adafruit BusIO**
+5. Open the sketch: **File > Open** > `src/esp/fingerprint_controller/fingerprint_controller.ino`
+6. Select board: **Tools > Board > ESP32 Arduino > ESP32 Dev Module**
+7. Select port: **Tools > Port > COMx (ESP32)**
+8. Click **Upload**
 
-# Install PlatformIO (if not installed)
-pip install platformio
-
-# Build and upload firmware
-platformio run --target upload
-
-# Monitor serial output
-platformio device monitor
-```
+> See `src/esp/README.md` for detailed Arduino IDE setup instructions.
 
 ## 5. RPi4 Kiosk
 

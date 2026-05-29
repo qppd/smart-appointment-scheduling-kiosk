@@ -1,13 +1,18 @@
-/*
+
  * Smart Appointment Scheduling Kiosk
  * ESP32 Firmware - Fingerprint Controller
+ * Arduino IDE Sketch
  *
- * Communicates with RPi4 over UART (Serial)
- * Controls AS608 fingerprint sensor via Adafruit library
+ * Before uploading, install these libraries via Arduino Library Manager:
+ *   - Adafruit Fingerprint Sensor Library by Adafruit
+ *   - Adafruit BusIO by Adafruit
  *
- * Protocol:
- *   Commands received via Serial (115200 baud)
- *   Responses sent back via Serial
+ * Board: ESP32 Dev Module (or your specific ESP32 board)
+ * Upload Speed: 115200
+ * Flash Mode: QIO / DIO
+ *
+ * Communicates with RPi4 over UART (Serial) at 115200 baud.
+ * Controls AS608 fingerprint sensor via hardware Serial1 at 57600 baud.
  *
  * Commands:
  *   PING            -> PONG
@@ -19,7 +24,6 @@
  *   FP_CLEAR        -> OK | ERR:<msg>
  */
 
-#include <Arduino.h>
 #include <Adafruit_Fingerprint.h>
 
 // Pin definitions for AS608
@@ -35,12 +39,6 @@ Adafruit_Fingerprint finger(&fingerSerial);
 const int MAX_CMD_LEN = 64;
 char cmdBuffer[MAX_CMD_LEN];
 int cmdIndex = 0;
-
-// Forward declarations
-bool enrollFingerprint(int id);
-int verifyFingerprint();
-bool deleteFingerprint(int id);
-uint8_t getFingerprintCount();
 
 void setup() {
   // Serial for RPi4 communication
@@ -123,7 +121,6 @@ void processCommand(const char* cmd) {
     Serial.println(response);
   }
   else if (strcmp(cmd, "FP_ID") == 0) {
-    // Returns last matched ID (stored in finger.fingerID)
     if (finger.fingerID > 0) {
       char response[16];
       snprintf(response, sizeof(response), "OK:%d", finger.fingerID);
@@ -143,8 +140,8 @@ void processCommand(const char* cmd) {
 }
 
 /**
- * Enroll a fingerprint at the given ID slot.
- * Returns FP_ENROLLED:<id> on success.
+ * Enroll a fingerprint at the given ID slot (1-127).
+ * Two-step scan process: place finger, remove, place same finger again.
  */
 bool enrollFingerprint(int id) {
   Serial.print("OK:Place finger on sensor for enrollment ID ");
@@ -220,7 +217,7 @@ bool enrollFingerprint(int id) {
 
 /**
  * Scan and verify fingerprint against enrolled templates.
- * Returns the matched template ID, or negative on error.
+ * Returns the matched template ID, or negative on error/no match.
  */
 int verifyFingerprint() {
   Serial.println("OK:Place finger on sensor");
