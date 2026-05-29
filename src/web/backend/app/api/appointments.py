@@ -62,8 +62,8 @@ async def book_appointment(
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
 
-    # Check availability
-    available = await check_slot_available(db, data.service_id, data.appointment_date, data.start_time, service.duration_minutes)
+    # Check availability (exclude current user to allow re-booking in same slot)
+    available = await check_slot_available(db, data.service_id, data.appointment_date, data.start_time, service.duration_minutes, exclude_resident_id=str(current_user.id))
     if not available:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Time slot is no longer available")
 
@@ -220,8 +220,8 @@ async def reschedule_appointment(
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found")
 
-    # Check slot availability
-    available = await check_slot_available(db, svc.id, data.appointment_date, data.start_time, svc.duration_minutes)
+    # Check slot availability (exclude current user for their own reschedule)
+    available = await check_slot_available(db, svc.id, data.appointment_date, data.start_time, svc.duration_minutes, exclude_resident_id=str(current_user.id))
     if not available:
         raise HTTPException(status_code=409, detail="Time slot not available")
 

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.models.resident import Resident, ResidentStatus, ResidentRole
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.core.config import settings
+from uuid import UUID
 import httpx
 
 async def register_resident(db: AsyncSession, data: dict) -> Resident:

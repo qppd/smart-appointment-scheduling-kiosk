@@ -13,23 +13,28 @@ async def check_slot_available(
     appointment_date: date,
     start_time: time,
     duration_minutes: int,
+    exclude_resident_id: str | None = None,
 ) -> bool:
-    """Check if a time slot is available for booking."""
+    """Check if a time slot is available for booking.
+
+    Args:
+        exclude_resident_id: If set, exclude this resident's appointments from the count
+                             (used when rescheduling, to allow the same resident to re-book).
+    """
     # Calculate end time
     start_dt = datetime.combine(appointment_date, start_time)
     end_dt = start_dt + timedelta(minutes=duration_minutes)
     end_time = end_dt.time()
 
     # Check overlapping appointments for this service on this date
-    stmt = select(func.count(Appointment.id)).where(
-        and_(
-            Appointment.service_id == service_id,
-            Appointment.appointment_date == appointment_date,
-            Appointment.status.notin_([AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW]),
-            Appointment.start_time < end_time,
-            Appointment.end_time > start_time,
-        )
+    conditions = and_(
+        Appointment.service_id == service_id,
+        Appointment.appointment_date == appointment_date,
+        Appointment.status.notin_([AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW]),
+        Appointment.start_time < end_time,
+        Appointment.end_time > start_time,
     )
+    stmt = select(func.count(Appointment.id)).where(conditions)
     result = await db.execute(stmt)
     count = result.scalar() or 0
 
