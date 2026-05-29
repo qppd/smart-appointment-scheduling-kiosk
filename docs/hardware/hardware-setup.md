@@ -2,17 +2,17 @@
 
 ## Bill of Materials
 
-| Component | Quantity | Estimated Cost (PHP) |
+| Component | Quantity |
 |-----------|----------|---------------------|
-| Raspberry Pi 4 (4GB) | 1 | 3,500 - 4,500 |
-| AS608 Fingerprint Sensor | 1 | 400 - 600 |
-| ESP32 Development Board | 1 | 350 - 500 |
-| 7-inch Touchscreen LCD | 1 | 2,000 - 3,500 |
-| MicroSD Card (32GB) | 1 | 400 - 600 |
-| Power Supply (5V/3A) | 1 | 300 - 500 |
-| Jumper Wires | 1 pack | 50 - 100 |
-| USB Cable (micro) | 1 | 50 - 100 |
-| Enclosure / 3D Printed Case | 1 | 500 - 1,000 |
+| Raspberry Pi 4 (4GB) | 1 | 
+| AS608 Fingerprint Sensor | 1 | 
+| ESP32 Development Board | 1 | 
+| 7-inch Touchscreen LCD | 1 | 
+| MicroSD Card (32GB) | 1 |
+| Power Supply (5V/3A) | 1 | 
+| Jumper Wires | 1 pack | 
+| USB Cable (micro) | 1 |
+| Enclosure / 3D Printed Case | 1 |
 
 ## Wiring Diagram
 
