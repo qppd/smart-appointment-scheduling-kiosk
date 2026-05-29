@@ -1,5 +1,6 @@
 import random
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.resident import Resident, ResidentStatus, ResidentRole
