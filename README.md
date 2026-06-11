@@ -54,3 +54,4 @@ npm run dev
 | Biometrics | ESP32 + AS608 fingerprint sensor |
 | SMS | Semaphore API (Philippines) |
 | Deployment | Vercel (frontend), VPS (backend) |
+
