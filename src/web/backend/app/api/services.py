@@ -6,7 +6,6 @@ from app.core.dependencies import get_current_user, get_current_admin
 from app.schemas.service import ServiceCreate, ServiceUpdate, ServiceResponse
 from app.models.service import Service
 from app.models.resident import Resident
-from typing import list
 
 router = APIRouter(prefix="/services", tags=["Services"])
 

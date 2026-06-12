@@ -39,7 +39,7 @@ export default function AdminDashboard() {
   };
 
   const statsCards = [
-    { label: 'Today's Appointments', value: stats?.today_appointments || 0, icon: Calendar, color: 'bg-blue-500' },
+    { label: "Today's Appointments", value: stats?.today_appointments || 0, icon: Calendar, color: 'bg-blue-500' },
     { label: 'Checked In', value: stats?.checked_in_today || 0, icon: Fingerprint, color: 'bg-green-500' },
     { label: 'Pending Activation', value: stats?.pending_activation || 0, icon: Users, color: 'bg-yellow-500' },
     { label: 'Active Services', value: stats?.active_services || 0, icon: Activity, color: 'bg-teal-500' },
@@ -232,7 +232,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[
             { label: 'Total Residents', value: stats.total_residents, icon: Users, color: 'blue' },
-            { label: 'Today's Appointments', value: stats.today_appointments, icon: Calendar, color: 'teal' },
+            { label: "Today's Appointments", value: stats.today_appointments, icon: Calendar, color: 'teal' },
             { label: 'Checked In Today', value: stats.checked_in_today, icon: Fingerprint, color: 'green' },
             { label: 'Pending Activation', value: stats.pending_activation, icon: Users, color: 'yellow' },
             { label: 'Active Services', value: stats.active_services, icon: Activity, color: 'purple' },

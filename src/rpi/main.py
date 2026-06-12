@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """
-Barangay Dolores — Kiosk Main Entry Point
-Runs the touchscreen kiosk UI and manages ESP32 communication.
+Barangay Dolores — Kiosk (CustomTkinter)
+Modern touchscreen kiosk for appointment check-in & fingerprint enrollment.
 """
-import tkinter as tk
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from ui.kiosk_app import KioskApp
 
 def main():
-    root = tk.Tk()
-    app = KioskApp(root)
-    root.mainloop()
+    app = KioskApp()
+    try:
+        app.run()
+    finally:
+        app.cleanup()
 
 if __name__ == "__main__":
     main()

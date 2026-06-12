@@ -1,95 +1,94 @@
 """
-Main Kiosk Application — Tkinter touchscreen UI.
+Kiosk App — CustomTkinter entry point with modern window management.
 """
-import tkinter as tk
-from tkinter import font as tkfont
-from ui.screens import HomeScreen, FingerprintScreen, CheckInResultScreen, EnrollScreen
+import customtkinter as ctk
+from utils.theme import DARK_BG, TEAL_PRIMARY
+from ui.screens import HomeScreen, FingerprintScreen, CheckInResultScreen, EnrollScreen, OverridePINScreen, AdminMenuScreen
 from services.kiosk_service import KioskService
-from utils.display import set_fullscreen, COLORS, FONTS
 
 class KioskApp:
-    def __init__(self, root: tk.Tk):
-        self.root = root
+    def __init__(self):
+        self.root = ctk.CTk()
         self.root.title("Barangay Dolores — Appointment Kiosk")
-        self.root.configure(bg=COLORS["bg"])
+        self.root.geometry("1280x800")
+        self.root.minsize(1024, 600)
 
-        # Set up fullscreen
-        set_fullscreen(self.root, True)
+        # Dark teal theme
+        ctk.set_appearance_mode("dark")
+        self.root.configure(fg_color=DARK_BG)
 
-        # Initialize kiosk service (ESP32 + API)
+        # Fullscreen toggle
+        self._fullscreen = False
+        self.root.bind("<F11>", lambda e: self._toggle_fullscreen())
+        self.root.bind("<Escape>", lambda e: self._exit_fullscreen() if self._fullscreen else None)
+
+        # Kiosk service (serial + API)
         self.kiosk_service = KioskService()
         esp_ok = self.kiosk_service.initialize()
 
-        # Container for screens
-        self.container = tk.Frame(root, bg=COLORS["bg"])
+        # Container
+        self.container = ctk.CTkFrame(self.root, fg_color="transparent")
         self.container.pack(fill="both", expand=True)
+        self.container.grid_columnconfigure(0, weight=1)
+        self.container.grid_rowconfigure(0, weight=1)
 
-        # Screens dictionary
-        self.screens = {}
         self.current_screen = None
-
-        # Show home screen
         self.show_home()
 
-        # Show ESP32 status
         if not esp_ok:
-            self.show_error("ESP32 not connected. Check serial connection.")
+            self._show_float("⚠️  ESP32 not connected — check serial cable", is_error=True)
+
+    # ── Navigation ──────────────────────────────────────────
 
     def show_home(self):
-        """Show the home/welcome screen."""
-        self.clear_container()
-        screen = HomeScreen(self.container, self)
-        screen.pack(fill="both", expand=True)
-        self.current_screen = "home"
+        self._switch(HomeScreen)
 
     def show_fingerprint_scan(self, mode: str = "checkin"):
-        """
-        Show fingerprint scanning screen.
-
-        Args:
-            mode: "checkin" for checking in, "enroll" for enrollment
-        """
-        self.clear_container()
-        screen = FingerprintScreen(self.container, self, mode)
-        screen.pack(fill="both", expand=True)
-        self.current_screen = "fingerprint"
+        self._scan_mode = mode
+        self._switch(FingerprintScreen)
 
     def show_checkin_result(self, result: dict):
-        """Show the check-in result screen."""
-        self.clear_container()
-        screen = CheckInResultScreen(self.container, self, result)
-        screen.pack(fill="both", expand=True)
-        self.current_screen = "result"
+        self._result = result
+        self._switch(CheckInResultScreen)
 
     def show_enroll(self, resident_id: str = ""):
-        """Show fingerprint enrollment screen."""
-        self.clear_container()
-        screen = EnrollScreen(self.container, self, resident_id)
-        screen.pack(fill="both", expand=True)
-        self.current_screen = "enroll"
+        self._switch(EnrollScreen)
 
-    def show_error(self, message: str):
-        """Show error overlay."""
-        error_frame = tk.Frame(self.container, bg=COLORS["error_bg"], bd=2, relief="solid")
-        error_frame.place(relx=0.1, rely=0.7, relwidth=0.8, relheight=0.2)
+    def show_pin_entry(self):
+        self._switch(OverridePINScreen)
 
-        tk.Label(
-            error_frame,
-            text=message,
-            font=FONTS["small"],
-            bg=COLORS["error_bg"],
-            fg=COLORS["error_fg"],
-            wraplength=800,
-        ).pack(expand=True, fill="both", padx=20, pady=10)
+    def show_admin_menu(self):
+        self._switch(AdminMenuScreen)
 
-        # Auto-remove after 5 seconds
-        self.root.after(5000, error_frame.destroy)
+    # ── Internals ───────────────────────────────────────────
 
-    def clear_container(self):
-        """Remove all widgets from container."""
-        for widget in self.container.winfo_children():
-            widget.destroy()
+    def _switch(self, screen_cls):
+        if self.current_screen:
+            self.current_screen.destroy()
+        self.current_screen = screen_cls(self.container, self)
+        self.current_screen.grid(row=0, column=0, sticky="nsew")
+
+    def _toggle_fullscreen(self):
+        self._fullscreen = not self._fullscreen
+        self.root.attributes("-fullscreen", self._fullscreen)
+
+    def _exit_fullscreen(self):
+        self._fullscreen = False
+        self.root.attributes("-fullscreen", False)
+
+    def _show_float(self, text: str, is_error: bool = False):
+        """Floating toast overlay."""
+        bg = "#dc2626" if is_error else TEAL_PRIMARY
+        toast = ctk.CTkFrame(self.container, fg_color=bg, corner_radius=18, border_width=0)
+        toast.place(relx=0.5, rely=0.85, anchor="center")
+
+        ctk.CTkLabel(toast, text=text,
+                     font=ctk.CTkFont(size=18),
+                     text_color="white").pack(padx=32, pady=16)
+        self.root.after(5000, toast.destroy)
+
+    def run(self):
+        self.root.mainloop()
 
     def cleanup(self):
-        """Clean up resources on exit."""
         self.kiosk_service.cleanup()
