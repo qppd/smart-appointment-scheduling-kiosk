@@ -51,15 +51,15 @@ export default function Booking() {
       const data = snap.val() || {};
       const existing = Object.entries(data).filter(([, a]: [string, any]) => a.appointment_date === selectedDate && a.service_id === selectedService.id);
       if (existing.length >= selectedService.slot_capacity_per_day) { setError('No slots available for this date.'); setLoading(false); return; }
-      const [start] = selectedSlot.split(' - ');
+      const [start, end] = selectedSlot.split(' - ');
       const id = await createAppointment({
         resident_id: user.uid, service_id: selectedService.id, service_name: selectedService.name,
-        appointment_date: selectedDate, start_time: start, end_time: start,
+        appointment_date: selectedDate, start_time: start, end_time: end,
         status: 'scheduled', queue_number: existing.length + 1, verified_by_fingerprint: false,
       });
       setAppointmentId(id);
       setStep('done');
-    } catch { setError('Failed to book. Try again.'); }
+    } catch (err) { console.error('Booking error:', err); setError('Failed to book. Try again.'); }
     finally { setLoading(false); }
   };
 
