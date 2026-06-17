@@ -5,7 +5,7 @@ import {
   onAuthStateChanged,
   type User,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, type Timestamp } from 'firebase/firestore';
+import { ref, set, get } from 'firebase/database';
 import { auth, db } from './firebase';
 
 export interface SignUpData {
@@ -22,7 +22,7 @@ export async function signUp(email: string, password: string, data: SignUpData) 
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
 
-  await setDoc(doc(db, 'users', user.uid), {
+  await set(ref(db, `users/${user.uid}`), {
     uid: user.uid,
     first_name: data.first_name,
     last_name: data.last_name,
@@ -34,7 +34,7 @@ export async function signUp(email: string, password: string, data: SignUpData) 
     role: 'resident',
     status: 'pending',
     fingerprint_enrolled: false,
-    created_at: serverTimestamp(),
+    created_at: new Date().toISOString(),
   });
 
   return user;
@@ -53,8 +53,8 @@ export function onAuthChange(callback: (user: User | null) => void) {
 }
 
 export async function getUserData(uid: string) {
-  const snap = await getDoc(doc(db, 'users', uid));
-  return snap.exists() ? snap.data() : null;
+  const snap = await get(ref(db, `users/${uid}`));
+  return snap.exists() ? snap.val() : null;
 }
 
 export { auth };
