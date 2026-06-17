@@ -31,7 +31,6 @@ export default function Home() {
                 <>
                   <Link href="/booking" className="text-gray-700 hover:text-teal-600">Book Appointment</Link>
                   <Link href="/my-appointments" className="text-gray-700 hover:text-teal-600">My Appointments</Link>
-                  <Link href="/admin" className="text-gray-700 hover:text-teal-600">Admin</Link>
                   <button onClick={() => signOut()} className="text-red-600 hover:text-red-700">Sign Out</button>
                 </>
               ) : (
