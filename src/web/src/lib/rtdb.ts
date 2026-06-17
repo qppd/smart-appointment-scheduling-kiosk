@@ -14,6 +14,14 @@ export function subscribeServices(callback: (services: Service[]) => void) {
   });
 }
 
+export function subscribeAllServices(callback: (services: Service[]) => void) {
+  return onValue(ref(db, 'services'), (snapshot) => {
+    const data = snapshot.val();
+    if (!data) { callback([]); return; }
+    callback(Object.entries(data).map(([id, s]: [string, any]) => ({ id, ...s }) as Service));
+  });
+}
+
 export function subscribeMyAppointments(residentId: string, callback: (appointments: Appointment[]) => void) {
   return onValue(ref(db, 'appointments'), (snapshot) => {
     const data = snapshot.val();
@@ -52,6 +60,14 @@ export function subscribeUsers(callback: (users: User[]) => void) {
   });
 }
 
+export function subscribeAllAppointments(callback: (appointments: Appointment[]) => void) {
+  return onValue(ref(db, 'appointments'), (snapshot) => {
+    const data = snapshot.val();
+    if (!data) { callback([]); return; }
+    callback(Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a }) as Appointment));
+  });
+}
+
 export function subscribeKioskStatus(kioskId: string, callback: (status: KioskStatus | null) => void) {
   return onValue(ref(db, `kiosk_status/${kioskId}`), (snapshot) => {
     callback(snapshot.exists() ? (snapshot.val() as KioskStatus) : null);
@@ -60,4 +76,23 @@ export function subscribeKioskStatus(kioskId: string, callback: (status: KioskSt
 
 export async function sendKioskCommand(data: { type: string; target_uid?: string; slot?: number }) {
   await push(ref(db, 'kiosk_commands'), { ...data, status: 'pending', created_at: new Date().toISOString() });
+}
+
+// Service CRUD
+export async function createService(data: Omit<Service, 'id' | 'created_at'>) {
+  const newRef = push(ref(db, 'services'));
+  await set(newRef, { ...data, created_at: new Date().toISOString() });
+  return newRef.key!;
+}
+
+export async function updateService(serviceId: string, data: Partial<Omit<Service, 'id' | 'created_at'>>) {
+  await update(ref(db, `services/${serviceId}`), data);
+}
+
+export async function deleteService(serviceId: string) {
+  await update(ref(db, `services/${serviceId}`), { is_active: false });
+}
+
+export async function permanentlyDeleteService(serviceId: string) {
+  await set(ref(db, `services/${serviceId}`), null);
 }
