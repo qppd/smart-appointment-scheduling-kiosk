@@ -1,0 +1,22 @@
+[Unit]
+Description=Barangay Dolores Kiosk Firebase Listener
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/kiosk
+ExecStart=/usr/bin/python3 /opt/kiosk/src/rpi/main.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=SERIAL_PORT=/dev/ttyUSB0
+Environment=SERIAL_BAUD=115200
+Environment=KIOSK_FIREBASE_API_KEY=your_api_key
+Environment=KIOSK_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+Environment=KIOSK_FIREBASE_DATABASE_URL=https://your_project_id-default-rtdb.firebaseio.com
+Environment=KIOSK_EMAIL=kiosk@yourdomain.com
+Environment=KIOSK_PASSWORD=your_password
+
+[Install]
+WantedBy=multi-user.target
