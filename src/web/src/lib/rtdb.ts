@@ -2,7 +2,7 @@ import {
   ref, onValue, push, set, update, get, query, orderByChild, equalTo,
 } from 'firebase/database';
 import { db } from './firebase';
-import type { Service, Appointment, User, KioskStatus } from '@/types';
+import type { Service, Appointment, User, KioskStatus, KioskCommand } from '@/types';
 
 export function subscribeServices(callback: (services: Service[]) => void) {
   return onValue(ref(db, 'services'), (snapshot) => {
@@ -95,4 +95,18 @@ export async function deleteService(serviceId: string) {
 
 export async function permanentlyDeleteService(serviceId: string) {
   await set(ref(db, `services/${serviceId}`), null);
+}
+
+export async function updateUser(uid: string, data: Partial<Pick<User, 'first_name' | 'last_name' | 'middle_name' | 'phone' | 'address' | 'birth_date'>>) {
+  await update(ref(db, `users/${uid}`), data);
+}
+
+export function subscribeKioskCommands(callback: (commands: KioskCommand[]) => void) {
+  return onValue(ref(db, 'kiosk_commands'), (snapshot) => {
+    const data = snapshot.val();
+    if (!data) { callback([]); return; }
+    callback(Object.entries(data)
+      .map(([id, c]: [string, any]) => ({ id, ...c }) as KioskCommand)
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
+  });
 }

@@ -626,12 +626,12 @@ Appointment System</p>
                   <p className="text-sm font-medium text-gray-900">{userName}</p>
                   <p className="text-xs text-gray-500 truncate">{userEmail}</p>
                 </div>
-                <button onClick={() => { setDropdownOpen(false); }}
+                <button onClick={() => { setDropdownOpen(false); router.push('/profile'); }}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                 >
                   <UserCircle className="h-4 w-4 text-gray-400" /> Profile
                 </button>
-                <button onClick={() => { setDropdownOpen(false); }}
+                <button onClick={() => { setDropdownOpen(false); router.push('/settings'); }}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                 >
                   <SettingsIcon className="h-4 w-4 text-gray-400" /> Settings
