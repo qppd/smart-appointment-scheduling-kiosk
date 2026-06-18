@@ -41,6 +41,10 @@ export default function Profile() {
       setAuthUser(u);
 
       getUserData(u.uid).then((data) => {
+        if (data?.role === 'admin') {
+          router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
+          return;
+        }
         if (data) {
           setUserData(data as UserType);
           setForm({

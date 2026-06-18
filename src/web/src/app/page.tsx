@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { onAuthChange, signOut } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
+import { onAuthChange, getUserData, signOut } from '@/lib/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { Calendar, Fingerprint, Bell, ClipboardList, UserCircle, ChevronDown, LogOut } from 'lucide-react';
 
@@ -26,14 +27,24 @@ const features = [
 ];
 
 export default function Home() {
+  const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   useClickOutside(dropdownRef, () => setDropdownOpen(false));
 
   useEffect(() => {
-    return onAuthChange((u) => setUser(u));
-  }, []);
+    return onAuthChange((u) => {
+      setUser(u);
+      if (u) {
+        getUserData(u.uid).then((data) => {
+          if (data?.role === 'admin') {
+            router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
+          }
+        });
+      }
+    });
+  }, [router]);
 
   return (
     <div>

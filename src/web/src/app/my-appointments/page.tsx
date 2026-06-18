@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { onAuthChange } from '@/lib/auth';
+import { onAuthChange, getUserData } from '@/lib/auth';
 import { subscribeMyAppointments, cancelAppointment } from '@/lib/rtdb';
 import type { Appointment } from '@/types';
 import { Calendar, XCircle, Loader2 } from 'lucide-react';
@@ -17,13 +17,19 @@ export default function MyAppointments() {
     let unsub: () => void;
     const authUnsub = onAuthChange((user) => {
       setAuthChecking(false);
-      if (!user) { 
-        router.push('/login'); 
-        return; 
+      if (!user) {
+        router.push('/login');
+        return;
       }
-      unsub = subscribeMyAppointments(user.uid, (apts) => { 
-        setAppointments(apts); 
-        setLoading(false); 
+      getUserData(user.uid).then((data) => {
+        if (data?.role === 'admin') {
+          router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
+          return;
+        }
+      });
+      unsub = subscribeMyAppointments(user.uid, (apts) => {
+        setAppointments(apts);
+        setLoading(false);
       });
     });
     return () => { 

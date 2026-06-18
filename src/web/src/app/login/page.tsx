@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signIn } from '@/lib/auth';
+import { signIn, getUserData } from '@/lib/auth';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
@@ -18,8 +18,13 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      await signIn(email, password);
-      router.push('/booking');
+      const result = await signIn(email, password);
+      const userData = await getUserData(result.user.uid);
+      if (userData?.role === 'admin') {
+        router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
+      } else {
+        router.push('/booking');
+      }
     } catch {
       setError('Invalid email or password');
     } finally {

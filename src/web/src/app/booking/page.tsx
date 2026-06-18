@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ref, get } from 'firebase/database';
-import { onAuthChange } from '@/lib/auth';
+import { onAuthChange, getUserData } from '@/lib/auth';
 import { subscribeServices, createAppointment } from '@/lib/rtdb';
 import { db } from '@/lib/firebase';
 import type { Service } from '@/types';
@@ -31,6 +31,11 @@ export default function Booking() {
         return;
       }
       setUser(u);
+      getUserData(u.uid).then((data) => {
+        if (data?.role === 'admin') {
+          router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
+        }
+      });
     });
     return () => unsub();
   }, [router]);
