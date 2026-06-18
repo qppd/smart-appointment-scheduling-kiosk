@@ -7,9 +7,9 @@ import { onAuthChange, getUserData } from '@/lib/auth';
 import { subscribeKioskStatus, subscribeKioskCommands, sendKioskCommand } from '@/lib/rtdb';
 import type { KioskStatus, KioskCommand } from '@/types';
 import {
-  ArrowLeft, Loader2, AlertCircle, CheckCircle, Shield,
+  ArrowLeft, Loader2, AlertCircle, CheckCircle,
   Save, Send, Bell, Lock, Settings as SettingsIcon, Monitor,
-  Activity, Fingerprint, Zap, Eye, ChevronRight,
+  Activity, Fingerprint, Zap,
 } from 'lucide-react';
 import { updatePassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -341,7 +341,7 @@ function AppPreferences() {
           <select
             value={rowsPerPage}
             onChange={(e) => updatePref('rowsPerPage', Number(e.target.value))}
-            className="border-of-none outline-none border border-gray-300 rounded-lg px-3 py-2 text-smfocus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            className="outline-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
           >
             {[5, 10, 25, 50, 100].map((n) => (
               <option key={n} value={n}>{n}</option>
