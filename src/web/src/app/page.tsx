@@ -1,10 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { onAuthChange, signOut } from '@/lib/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { Calendar, Fingerprint, Bell, ClipboardList } from 'lucide-react';
+import { Calendar, Fingerprint, Bell, ClipboardList, UserCircle, ChevronDown, LogOut } from 'lucide-react';
+
+function useClickOutside(ref: React.RefObject<HTMLElement>, handler: () => void) {
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        handler();
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [ref, handler]);
+}
 
 const features = [
   { icon: Calendar, title: 'Online Booking', desc: 'Schedule appointments from home or mobile' },
@@ -15,6 +27,9 @@ const features = [
 
 export default function Home() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  useClickOutside(dropdownRef, () => setDropdownOpen(false));
 
   useEffect(() => {
     return onAuthChange((u) => setUser(u));
@@ -29,10 +44,40 @@ export default function Home() {
             <div className="flex items-center gap-4">
               {user ? (
                 <>
-                  <Link href="/profile" className="text-gray-700 hover:text-teal-600">Profile</Link>
                   <Link href="/booking" className="text-gray-700 hover:text-teal-600">Book Appointment</Link>
                   <Link href="/my-appointments" className="text-gray-700 hover:text-teal-600">My Appointments</Link>
-                  <button onClick={() => signOut()} className="text-red-600 hover:text-red-700">Sign Out</button>
+                  <div className="relative" ref={dropdownRef}>
+                    <button
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center">
+                        <UserCircle className="h-5 w-5 text-white" />
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {dropdownOpen && (
+                      <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                        <div className="px-4 py-2 border-b border-gray-100 mb-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{user.email || 'User'}</p>
+                        </div>
+                        <Link
+                          href="/profile"
+                          onClick={() => setDropdownOpen(false)}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                        >
+                          <UserCircle className="h-4 w-4 text-gray-400" /> Profile
+                        </Link>
+                        <hr className="my-1 border-gray-100" />
+                        <button
+                          onClick={() => { setDropdownOpen(false); signOut(); }}
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                        >
+                          <LogOut className="h-4 w-4" /> Logout
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <>
