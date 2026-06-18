@@ -1,0 +1,52 @@
+#ifndef COMPONENTS_FINGERPRINT_AS608_H
+#define COMPONENTS_FINGERPRINT_AS608_H
+
+#include <Arduino.h>
+#include <HardwareSerial.h>
+#include <Adafruit_Fingerprint.h>
+
+// Wrapper for AS608 fingerprint module using a HardwareSerial instance
+class FingerprintAS608 {
+public:
+  // Provide the HardwareSerial port (e.g., Serial2) and RX/TX pins are configured externally
+  FingerprintAS608(HardwareSerial &serial, uint32_t baud = 57600);
+  void begin();
+  bool verifySensor();
+  int getTemplateCount();
+  // Enroll a finger to an ID (blocking, returns true on success)
+  bool enroll(uint16_t id);
+  // Delete a fingerprint by ID, returns true on success
+  bool deleteFingerprint(uint16_t id);
+  // Empty the entire fingerprint database, returns true on success
+  bool emptyDatabase();
+  // Load a model by ID to check if it exists, returns status code
+  uint8_t loadModel(uint16_t id);
+  // Search for fingerprint, returns -1 on error, 0 if not found, or matching ID
+  int search();
+
+  // Check if finger is detected on the sensor
+  bool isFingerDetected();
+  // Authenticate fingerprint, returns user ID on success, -1 on failure
+  int authenticate();
+
+  // Non-blocking search: starts a search and returns immediately. When complete,
+  // the provided callback will be called with the result (id or 0 not found or -1 error).
+  using SearchCallback = void(*)(int);
+  bool startSearch(SearchCallback cb);
+  // Call in loop() to progress async actions
+  void update();
+
+  // Expose the last matched fingerprint ID from the underlying Adafruit driver
+  uint16_t getLastFingerID() const { return _finger.fingerID; }
+
+private:
+  HardwareSerial &_serial;
+  Adafruit_Fingerprint _finger;
+  uint32_t _baud;
+  // async state
+  enum AsyncState { IDLE, SEARCHING };
+  AsyncState _state;
+  SearchCallback _searchCb;
+};
+
+#endif // COMPONENTS_FINGERPRINT_AS608_H

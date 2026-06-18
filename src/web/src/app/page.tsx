@@ -62,7 +62,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">How It Works</h2>
           <div className="grid md:grid-cols-4 gap-8">
-            {['Register Online', 'Visit the Hall', 'Book Online', 'Check-in at Kiosk'].map((title, i) => (
+            {['Register Online', 'Book Online', 'Visit the Hall', 'Check-in at Kiosk'].map((title, i) => (
               <div key={title} className="text-center">
                 <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl font-bold text-teal-600">{i + 1}</span>
