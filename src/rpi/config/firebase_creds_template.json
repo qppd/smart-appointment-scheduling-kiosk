@@ -1,0 +1,48 @@
+{
+  "description": "Firebase service-account credentials + RTDB vars. Replace every placeholder with your actual values from Firebase Console.",
+  "where_to_get": "Firebase Console → Project Settings → Service Accounts → Generate New Private Key",
+  "fields": {
+    "type": "service_account",
+    "project_id": "YOUR_PROJECT_ID",
+    "private_key_id": "KEY_ID",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nYOUR_KEY\n-----END PRIVATE KEY-----\n",
+    "client_email": "firebase-adminsdk-xxx@YOUR_PROJECT_ID.iam.gserviceaccount.com",
+    "client_id": "CLIENT_ID",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/...",
+    "api_key": "AIzaSy... (Web API Key)",
+    "auth_domain": "YOUR_PROJECT_ID.firebaseapp.com",
+    "database_url": "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    "storage_bucket": "YOUR_PROJECT_ID.appspot.com"
+  },
+  "example_rtdb_structure": {
+    "residents": {
+      "RES-001": {
+        "first_name": "Juan",
+        "last_name": "Dela Cruz",
+        "contact_number": "09171234567",
+        "fingerprint_template_id": 5,
+        "created_at": "2026-01-15"
+      }
+    },
+    "appointments": {
+      "APT-001": {
+        "resident_id": "RES-001",
+        "service_name": "Barangay Clearance",
+        "appointment_date": "2026-06-16",
+        "start_time": "09:00",
+        "status": "scheduled",
+        "queue_number": 1
+      }
+    }
+  },
+  "notes": [
+    "Save this file as 'firebase_creds.json' in the project root OR in the 'config/' folder (both are gitignored).",
+    "The private_key field must preserve the literal newline characters (\\n) inside the key.",
+    "Do NOT commit firebase_creds.json with real keys.",
+    "Enable Realtime Database in Firebase Console and set rules to allow service-account access.",
+    "INDEX in RTDB rules for order_by_child queries (admin screen): { \"appointments\": { \"appointment_date\": true, \"resident_id\": true }, \"residents\": { \"fingerprint_template_id\": true } }"
+  ]
+}
