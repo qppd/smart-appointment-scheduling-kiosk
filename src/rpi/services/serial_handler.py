@@ -54,7 +54,8 @@ class SerialHandler:
             try:
                 self.ser.reset_input_buffer()
                 self.ser.write((command + "\n").encode())
-                response = self.ser.readline().decode().strip()
+                raw = self.ser.readline()
+                response = self.ser.readline().decode('utf-8', errors='replace').strip()
                 return response if response else "ERR:No response"
             except Exception as e:
                 print(f"[SERIAL] Error sending command: {e}")
@@ -64,15 +65,38 @@ class SerialHandler:
         """Check if ESP32 is alive."""
         return self.send_command("PING") == "PONG"
 
+    def find_free_slot(self) -> int:
+        """Find the next available fingerprint template slot (1-127)."""
+        count = self.get_template_count()
+        if count >= 127:
+            return -1
+        return count + 1
+
     def enroll_fingerprint(self, slot: int = 1) -> Tuple[bool, str]:
-        """Enroll a fingerprint at the given slot."""
-        resp = self.send_command(f"FP_ENROLL:{slot}", timeout=60)
-        if resp.startswith("FP_ENROLLED:"):
-            return True, resp.split(":")[1]
-        elif resp.startswith("OK"):
-            return True, resp
-        else:
-            return False, resp
+        """Enroll a fingerprint at the given slot. Reads multi-line ESP response."""
+        if not self.ensure_connected():
+            return False, "ERR:Not connected"
+
+        with self._lock:
+            try:
+                self.ser.reset_input_buffer()
+                self.ser.write(f"FP_ENROLL:{slot}\n".encode())
+
+                deadline = time.time() + 60
+                while time.time() < deadline:
+                    raw = self.ser.readline()
+                    if not raw:
+                        continue
+                    line = raw.decode('utf-8', errors='replace').strip()
+                    if line.startswith("FP_ENROLLED:"):
+                        parts = line.split(":")
+                        return True, parts[1] if len(parts) > 1 else str(slot)
+                    elif line.startswith("ERR:"):
+                        return False, line
+                return False, "ERR:Enrollment timed out"
+            except Exception as e:
+                print(f"[SERIAL] Enrollment error: {e}")
+                return False, f"ERR:{e}"
 
     def verify_fingerprint(self) -> Tuple[bool, Optional[int]]:
         """Scan fingerprint and verify against enrolled templates."""
