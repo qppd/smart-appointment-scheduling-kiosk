@@ -22,6 +22,7 @@ load_dotenv()
 
 import customtkinter as ctk
 import pyrebase
+import requests
 
 from services.serial_handler import SerialHandler
 from services.command_processor import CommandProcessor
@@ -36,6 +37,7 @@ from gui.screens.verify import VerifyScreen
 from gui.screens.result import ResultScreen
 from gui.screens.admin import AdminScreen
 from gui.screens.enroll import EnrollScreen
+from gui.screens.otp_enroll import OTPEnrollScreen
 
 
 FIREBASE_CONFIG = {
@@ -66,9 +68,13 @@ class FirebaseAuthWrapper:
         print(f"[AUTH] Signed in as {KIOSK_EMAIL}")
 
     def refresh_if_needed(self):
-        user = self.auth.refresh(self.refresh_token)
-        self.id_token = user["idToken"]
-        print("[AUTH] Token refreshed")
+        try:
+            user = self.auth.refresh(self.refresh_token)
+            self.id_token = user["idToken"]
+            print("[AUTH] Token refreshed")
+        except Exception as e:
+            print(f"[AUTH] Refresh failed ({e}), re-authenticating...")
+            self._sign_in()
 
 
 class FirebaseService:
@@ -80,24 +86,36 @@ class FirebaseService:
         self.fb_auth = fb_auth
         self._db_lock = threading.Lock()
 
-    def safe_get(self, path: str):
+    def _call_with_refresh(self, fn):
+        """Execute fn under the DB lock, refresh token on 401, retry once."""
         with self._db_lock:
-            resp = self.db.get(self.fb_auth.id_token)
+            try:
+                return fn()
+            except requests.exceptions.HTTPError as e:
+                if "401" not in str(e):
+                    raise
+        # Token may have expired — refresh outside the lock (network I/O)
+        self.fb_auth.refresh_if_needed()
+        with self._db_lock:
+            return fn()
+
+    def safe_get(self, path: str):
+        resp = self._call_with_refresh(lambda: self.db.get(self.fb_auth.id_token))
         if resp:
             return resp.val() or {}
         return {}
 
     def get_child(self, path: str):
-        with self._db_lock:
-            resp = self.db.child(path).get(self.fb_auth.id_token)
+        resp = self._call_with_refresh(
+            lambda: self.db.child(path).get(self.fb_auth.id_token))
         if resp:
             v = resp.val()
             return v if isinstance(v, dict) else {}
         return {}
 
     def update_child(self, path: str, data: dict):
-        with self._db_lock:
-            self.db.child(path).update(data, self.fb_auth.id_token)
+        self._call_with_refresh(
+            lambda: self.db.child(path).update(data, self.fb_auth.id_token))
 
 
 class KioskApp(ctk.CTk):
@@ -129,14 +147,21 @@ class KioskApp(ctk.CTk):
         self.bind("<Configure>", self._on_window_resize)
 
         # Backends (initialized before UI)
-        pyrebase_app = pyrebase.initialize_app(FIREBASE_CONFIG)
-        fb_auth = FirebaseAuthWrapper(pyrebase_app.auth())
-        self.fb_service = FirebaseService.__new__(FirebaseService)
-        self.fb_service.firebase = pyrebase_app
-        self.fb_service.auth = pyrebase_app.auth()
-        self.fb_service.db = pyrebase_app.database()
-        self.fb_service.fb_auth = fb_auth
-        self.fb_service._db_lock = threading.Lock()
+        self._firebase_ready = False
+        try:
+            pyrebase_app = pyrebase.initialize_app(FIREBASE_CONFIG)
+            fb_auth = FirebaseAuthWrapper(pyrebase_app.auth())
+            self.fb_service = FirebaseService.__new__(FirebaseService)
+            self.fb_service.firebase = pyrebase_app
+            self.fb_service.auth = pyrebase_app.auth()
+            self.fb_service.db = pyrebase_app.database()
+            self.fb_service.fb_auth = fb_auth
+            self.fb_service._db_lock = threading.Lock()
+            self._firebase_ready = True
+            print("[FIREBASE] Connected and authenticated")
+        except Exception as e:
+            print(f"[FIREBASE] Connection failed: {e}")
+            self.fb_service = None
 
         # Serial
         self.serial = SerialHandler(port=SERIAL_PORT, baud=SERIAL_BAUD)
@@ -158,7 +183,13 @@ class KioskApp(ctk.CTk):
 
         self.home_screen = HomeScreen(
             self, on_verify=self._show_verify, on_admin=self._show_admin,
-            on_enroll=self._show_enroll)
+            on_enroll=self._show_otp_enroll)
+
+        # Update Firebase status after UI is ready
+        try:
+            self.home_screen.update_firebase_status(self._firebase_ready)
+        except Exception:
+            pass
         self.verify_screen = VerifyScreen(
             self, serial_handler=self.serial,
             on_result=self._show_result, on_cancel=self._show_home)
@@ -167,6 +198,10 @@ class KioskApp(ctk.CTk):
         self.admin_screen = AdminScreen(
             self, serial_handler=self.serial,
             firebase_service=self.fb_service, on_back=self._show_home)
+        self.otp_enroll_screen = OTPEnrollScreen(
+            self, firebase_service=self.fb_service,
+            on_proceed=self._proceed_to_enroll,
+            on_cancel=self._show_home)
         self.enroll_screen = EnrollScreen(
             self, serial_handler=self.serial,
             firebase_service=self.fb_service,
@@ -174,7 +209,7 @@ class KioskApp(ctk.CTk):
 
         for s in (self.home_screen, self.verify_screen,
                    self.result_screen, self.admin_screen,
-                   self.enroll_screen):
+                   self.otp_enroll_screen, self.enroll_screen):
             s.grid(row=0, column=0, sticky="nsew")
 
         # Threads
@@ -204,7 +239,7 @@ class KioskApp(ctk.CTk):
         # Re-apply fonts and widget sizes on every screen
         for screen_attr in ("home_screen", "verify_screen",
                              "result_screen", "admin_screen",
-                             "enroll_screen"):
+                             "otp_enroll_screen", "enroll_screen"):
             screen = getattr(self, screen_attr, None)
             if screen and hasattr(screen, "rescale"):
                 try:
@@ -235,6 +270,14 @@ class KioskApp(ctk.CTk):
         self.admin_screen.show()
 
     def _show_enroll(self, appt: dict):
+        self._show(self.enroll_screen)
+        self.enroll_screen.start_for(appt)
+
+    def _show_otp_enroll(self):
+        self.otp_enroll_screen.reset()
+        self._show(self.otp_enroll_screen)
+
+    def _proceed_to_enroll(self, appt: dict):
         self._show(self.enroll_screen)
         self.enroll_screen.start_for(appt)
 
@@ -326,6 +369,8 @@ class KioskApp(ctk.CTk):
         self.after(3000, self._check_serial_status)
 
     def _heartbeat_loop(self):
+        if not self.fb_service:
+            return
         while self.running:
             try:
                 esp_connected = self.serial.ser is not None and self.serial.ser.is_open
@@ -349,6 +394,8 @@ class KioskApp(ctk.CTk):
             time.sleep(HEARTBEAT_INTERVAL / 1000)
 
     def _commands_loop(self):
+        if not self.fb_service:
+            return
         while self.running:
             try:
                 commands = self.fb_service.get_child("kiosk_commands") or {}
@@ -361,18 +408,21 @@ class KioskApp(ctk.CTk):
                         continue
                     print(f"[CMD] {cid}: {cmd.get('type')}")
                     result = self.processor.process(cmd)
-                    with self.fb_service._db_lock:
-                        self.fb_service.db.child("kiosk_commands").child(cid).update({
+                    self.fb_service.update_child(
+                        f"kiosk_commands/{cid}",
+                        {
                             "status": result.get("status", "completed"),
                             "result": result,
                             "completed_at": int(time.time() * 1000),
-                        }, self.fb_service.fb_auth.id_token)
+                        })
                     self.processed_ids.add(cid)
             except Exception:
                 traceback.print_exc()
             time.sleep(COMMAND_POLL_INTERVAL / 1000)
 
     def _appointments_loop(self):
+        if not self.fb_service:
+            return
         # Resident name cache so we don't refetch the same user on every loop
         user_cache = getattr(self, "_user_cache", None)
         if not isinstance(user_cache, dict):
@@ -410,6 +460,8 @@ class KioskApp(ctk.CTk):
             time.sleep(5)
 
     def _token_refresh_loop(self):
+        if not self.fb_service:
+            return
         while self.running:
             time.sleep(3000)
             try:

@@ -109,14 +109,14 @@ class HomeScreen(ctk.CTkFrame):
         left.grid(row=0, column=0, sticky="nsew", padx=(0, s(20)))
         left.grid_rowconfigure(0, weight=1)
 
-        self._fingerprint_btn = ctk.CTkButton(
-            left, text="", font=font_tuple("body"), fg_color="transparent",
-            hover_color=BG_SECONDARY, corner_radius=s(24),
+        # Use a Frame (not Button) so internal widgets don't swallow click events
+        self._fingerprint_btn = ctk.CTkFrame(
+            left, fg_color="transparent", corner_radius=s(24),
             border_width=s(2), border_color=CARD_BORDER,
-            height=s(260), width=s(280),
-            command=self.on_verify,
+            width=s(280), height=s(260), cursor="hand2",
         )
         self._fingerprint_btn.grid(row=0, column=0, pady=(0, s(10)))
+        self._fingerprint_btn.grid_propagate(False)
 
         btn_inner = ctk.CTkFrame(self._fingerprint_btn, fg_color="transparent")
         btn_inner.place(relx=0.5, rely=0.5, anchor="center")
@@ -129,11 +129,43 @@ class HomeScreen(ctk.CTkFrame):
         self._fp_canvas.pack(pady=(0, s(8)))
         self._draw_fingerprint_icon(self._fp_canvas, PRIMARY, icon_sz)
 
-        ctk.CTkLabel(btn_inner, text="Tap to Check In",
-                     font=font_tuple("heading"), text_color=PRIMARY).pack()
-        ctk.CTkLabel(btn_inner,
-                     text="Place your finger on the scanner",
-                     font=font_tuple("small"), text_color=TEXT_MUTED).pack()
+        self._fp_title = ctk.CTkLabel(
+            btn_inner, text="Tap to Check In",
+            font=font_tuple("heading"), text_color=PRIMARY)
+        self._fp_title.pack()
+        self._fp_subtitle = ctk.CTkLabel(
+            btn_inner, text="Place your finger on the scanner",
+            font=font_tuple("small"), text_color=TEXT_MUTED)
+        self._fp_subtitle.pack()
+
+        # Self-service enrollment link (below check-in)
+        if self.on_enroll:
+            self._enroll_link = ctk.CTkButton(
+                left, text="New here? Enroll your fingerprint",
+                font=font_tuple("small"), text_color=PRIMARY,
+                fg_color="transparent", hover_color=PRIMARY_50,
+                height=s(36), corner_radius=s(8),
+                command=self._on_enroll_link)
+            self._enroll_link.grid(row=1, column=0, pady=(0, 0))
+
+        # Recursive click binding + manual hover effect
+        def _click_fp(_e=None):
+            self.on_verify()
+            return "break"
+
+        def _bind_fp_clicks(w):
+            w.bind("<Button-1>", _click_fp)
+            for child in w.winfo_children():
+                _bind_fp_clicks(child)
+
+        _bind_fp_clicks(self._fingerprint_btn)
+
+        self._fingerprint_btn.bind(
+            "<Enter>",
+            lambda e: self._fingerprint_btn.configure(fg_color=BG_SECONDARY))
+        self._fingerprint_btn.bind(
+            "<Leave>",
+            lambda e: self._fingerprint_btn.configure(fg_color="transparent"))
 
         # Right — stats + queue
         right = ctk.CTkFrame(content, fg_color="transparent")
@@ -188,14 +220,42 @@ class HomeScreen(ctk.CTkFrame):
             text_color=TEXT_MUTED, anchor="e")
         self._fb_status.grid(row=0, column=1, sticky="e", padx=s(16))
 
-        # Admin long-press
+        # Admin long-press area — use Frame so inner label doesn't swallow events
+        admin_btn = ctk.CTkFrame(
+            status, fg_color=BG_SECONDARY, corner_radius=s(6),
+            width=s(80), height=s(28), cursor="hand2",
+            border_width=1, border_color=CARD_BORDER_LIGHT,
+        )
+        admin_btn.place(relx=0.5, rely=0.5, anchor="center")
+        admin_btn.grid_propagate(False)
+        admin_btn.lift()
+
         admin_label = ctk.CTkLabel(
-            status, text="Admin", font=font_tuple("tiny"),
-            text_color=TEXT_MUTED, cursor="hand2")
+            admin_btn, text="Admin", font=font_tuple("tiny"),
+            text_color=TEXT_SECONDARY)
         admin_label.place(relx=0.5, rely=0.5, anchor="center")
-        admin_label.bind("<ButtonPress-1>", self._start_long_press)
-        admin_label.bind("<ButtonRelease-1>", self._cancel_long_press)
-        admin_label.bind("<Leave>", self._cancel_long_press)
+
+        def _admin_press(_e=None):
+            self._start_long_press(None)
+            return "break"
+
+        def _admin_release(_e=None):
+            self._cancel_long_press(None)
+            return "break"
+
+        def _bind_admin_clicks(w):
+            w.bind("<ButtonPress-1>", _admin_press)
+            w.bind("<ButtonRelease-1>", _admin_release)
+            for child in w.winfo_children():
+                _bind_admin_clicks(child)
+
+        _bind_admin_clicks(admin_btn)
+
+        admin_btn.bind(
+            "<Enter>", lambda e: admin_btn.configure(fg_color=PRIMARY_50))
+        admin_btn.bind(
+            "<Leave>", lambda e: admin_btn.configure(fg_color=BG_SECONDARY))
+        admin_label.configure(text_color=TEXT_PRIMARY)
 
     def _resize_header(self, header):
         """Set header height to ~15% of window height."""
@@ -291,21 +351,13 @@ class HomeScreen(ctk.CTkFrame):
                      font=font_tuple("small"), text_color=TEXT_MUTED
                      ).pack(side="left", padx=(0, s(8)))
 
-        needs_enroll = (a.get("status") == "scheduled") and (not a.get("fingerprint_enrolled", True))
-        if needs_enroll:
-            ctk.CTkButton(time_frame, text="Enroll Finger",
-                         font=font_tuple("tiny_bold"), text_color=TEXT_WHITE,
-                         fg_color=PRIMARY, hover_color=PRIMARY_DARK,
-                         height=s(28), width=s(110), corner_radius=s(6),
-                         command=lambda ap=a: self._on_card_enroll(ap)).pack(side="left", padx=s(2))
-        else:
-            ctk.CTkLabel(time_frame, text=a.get("status", ""),
-                         font=font_tuple("tiny"), text_color=sfg,
-                         fg_color=sbg, corner_radius=s(8)).pack(side="left", padx=s(2))
+        ctk.CTkLabel(time_frame, text=a.get("status", ""),
+                     font=font_tuple("tiny"), text_color=sfg,
+                     fg_color=sbg, corner_radius=s(8)).pack(side="left", padx=s(2))
 
-    def _on_card_enroll(self, appt: dict):
+    def _on_enroll_link(self):
         if self.on_enroll:
-            self.on_enroll(appt)
+            self.on_enroll()
 
     def _refresh_status_bar(self):
         esp_color = SUCCESS if self.esp_connected else ERROR

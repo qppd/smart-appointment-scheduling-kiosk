@@ -172,6 +172,12 @@ class EnrollScreen(ctk.CTkFrame):
                     "fingerprint_enrolled": True,
                     "fingerprint_enrolled_at": int(time.time() * 1000),
                 })
+                # Consume the OTP so it can't be reused
+                appt_id = appt.get("id")
+                if appt_id:
+                    self.firebase.update_child(f"appointments/{appt_id}", {
+                        "enrollment_otp_consumed_at": int(time.time() * 1000),
+                    })
             except Exception as e:
                 print(f"[ENROLL] Firebase update error: {e}")
 
