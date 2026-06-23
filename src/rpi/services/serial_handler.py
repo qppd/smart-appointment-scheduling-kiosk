@@ -54,10 +54,23 @@ class SerialHandler:
         with self._lock:
             try:
                 self.ser.reset_input_buffer()
+                self.ser.reset_output_buffer()
                 self.ser.write((command + "\n").encode())
-                raw = self.ser.readline()
-                response = self.ser.readline().decode('utf-8', errors='replace').strip()
+                self.ser.flush()  # Ensure data is sent
+
+                start = time.time()
+                response = ""
+                while time.time() - start < timeout:
+                    raw = self.ser.readline()
+                    if raw:
+                        response = raw.decode('utf-8', errors='replace').strip()
+                        if response:
+                            break
+                    time.sleep(0.01)
                 return response if response else "ERR:No response"
+            except PermissionError as e:
+                print(f"[SERIAL] Permission error (device busy): {e}")
+                return f"ERR:PermissionError - device busy"
             except Exception as e:
                 print(f"[SERIAL] Error sending command: {e}")
                 return f"ERR:{e}"
@@ -81,7 +94,9 @@ class SerialHandler:
         with self._lock:
             try:
                 self.ser.reset_input_buffer()
+                self.ser.reset_output_buffer()
                 self.ser.write(f"FP_ENROLL:{slot}\n".encode())
+                self.ser.flush()
 
                 deadline = time.time() + 60
                 while time.time() < deadline:
@@ -89,12 +104,17 @@ class SerialHandler:
                     if not raw:
                         continue
                     line = raw.decode('utf-8', errors='replace').strip()
+                    if not line:
+                        continue
                     if line.startswith("FP_ENROLLED:"):
                         parts = line.split(":")
                         return True, parts[1] if len(parts) > 1 else str(slot)
                     elif line.startswith("ERR:"):
                         return False, line
                 return False, "ERR:Enrollment timed out"
+            except PermissionError as e:
+                print(f"[SERIAL] Enrollment permission error: {e}")
+                return False, "ERR:PermissionError - device busy"
             except Exception as e:
                 print(f"[SERIAL] Enrollment error: {e}")
                 return False, f"ERR:{e}"
@@ -107,7 +127,9 @@ class SerialHandler:
         with self._lock:
             try:
                 self.ser.reset_input_buffer()
+                self.ser.reset_output_buffer()
                 self.ser.write("FP_AUTOENROLL\n".encode())
+                self.ser.flush()
 
                 deadline = time.time() + 60
                 while time.time() < deadline:
@@ -115,12 +137,17 @@ class SerialHandler:
                     if not raw:
                         continue
                     line = raw.decode('utf-8', errors='replace').strip()
+                    if not line:
+                        continue
                     if line.startswith("FP_ENROLLED:"):
                         parts = line.split(":")
                         return True, parts[1] if len(parts) > 1 else "0"
                     elif line.startswith("ERR:"):
                         return False, line
                 return False, "ERR:Enrollment timed out"
+            except PermissionError as e:
+                print(f"[SERIAL] Auto-enrollment permission error: {e}")
+                return False, "ERR:PermissionError - device busy"
             except Exception as e:
                 print(f"[SERIAL] Auto-enrollment error: {e}")
                 return False, f"ERR:{e}"

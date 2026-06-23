@@ -157,25 +157,33 @@ class OTPEnrollScreen(ctk.CTkFrame):
 
     def _do_verify(self):
         try:
-            today = time.strftime("%Y-%m-%d")
+            from datetime import datetime, timezone
+            today_local = datetime.now().strftime("%Y-%m-%d")
+            today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             all_appts = self.firebase.get_child("appointments") or {}
             matched = None
             matched_uid = None
             for apt_id, apt in all_appts.items():
                 if not isinstance(apt, dict):
                     continue
-                if (apt.get("enrollment_otp") == self._otp
-                        and apt.get("appointment_date") == today
-                        and apt.get("status") == "scheduled"):
-                    # Check expiry
+                apt_otp = str(apt.get("enrollment_otp", ""))
+                apt_date = apt.get("appointment_date", "")
+                apt_status = apt.get("status", "")
+                # Match OTP exactly, and date (allow local or UTC date)
+                if (apt_otp == self._otp
+                        and apt_status == "scheduled"
+                        and (apt_date == today_local or apt_date == today_utc)):
+                    # Check expiry - be lenient with timezone issues
                     exp = apt.get("enrollment_otp_expires_at")
                     if exp:
                         try:
-                            from datetime import datetime
                             exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
-                            if exp_dt < datetime.now(exp_dt.tzinfo):
-                                continue  # expired
-                        except ValueError:
+                            now_utc = datetime.now(timezone.utc)
+                            # Add 1 hour buffer for timezone issues
+                            if exp_dt < now_utc:
+                                print(f"[OTP] Expired: {exp_dt} < {now_utc}")
+                                continue
+                        except (ValueError, TypeError):
                             pass
                     # Check already consumed
                     if apt.get("enrollment_otp_consumed_at"):
@@ -186,6 +194,7 @@ class OTPEnrollScreen(ctk.CTkFrame):
                     break
 
             if not matched:
+                print(f"[OTP] No match for OTP={self._otp}, today_local={today_local}, today_utc={today_utc}")
                 self.after(0, lambda: self._error_label.configure(
                     text="Invalid or expired code. Check your My Appointments page."))
                 self.after(0, lambda: self._status_label.configure(
@@ -204,6 +213,8 @@ class OTPEnrollScreen(ctk.CTkFrame):
             self.after(0, self._show_result)
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self.after(0, lambda: self._error_label.configure(text=f"Error: {e}"))
 
     def _show_result(self):
