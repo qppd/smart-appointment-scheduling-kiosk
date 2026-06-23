@@ -1,6 +1,6 @@
 """
-AdminScreen — PIN-protected admin panel for fingerprint enrollment,
-system status monitoring, and ESP32 command control.
+AdminScreen — PIN-protected admin panel for system status monitoring
+and ESP32 command control.
 """
 
 import tkinter as tk
@@ -26,7 +26,7 @@ class AdminScreen(ctk.CTkFrame):
         self.serial_handler = serial_handler
         self.firebase = firebase_service
         self.on_back = on_back
-        self._tab = "enroll"
+        self._tab = "status"
         self._build_ui()
 
     def show(self):
@@ -123,7 +123,6 @@ class AdminScreen(ctk.CTkFrame):
         self._tab_frame.grid(row=0, column=0, sticky="ew", pady=(0, s(12)))
 
         tabs = [
-            ("enroll", "Enroll Fingerprint"),
             ("status", "System Status"),
             ("commands", "Commands"),
         ]
@@ -162,7 +161,7 @@ class AdminScreen(ctk.CTkFrame):
     def _show_content(self):
         self._content_frame.grid()
         self._pin_frame.grid_remove()
-        self._switch_tab("enroll")
+        self._switch_tab("status")
 
     def _check_pin(self):
         pin = self._pin_entry.get()
@@ -186,145 +185,10 @@ class AdminScreen(ctk.CTkFrame):
         for w in self._tab_content.winfo_children():
             w.destroy()
 
-        if key == "enroll":
-            self._build_enroll_tab()
-        elif key == "status":
+        if key == "status":
             self._build_status_tab()
         elif key == "commands":
             self._build_commands_tab()
-
-    # ── Enroll Tab ──
-
-    def _build_enroll_tab(self):
-        frame = self._tab_content
-
-        left = ctk.CTkFrame(frame, fg_color="transparent")
-        left.pack(side="left", fill="both", expand=True, padx=(0, s(10)))
-
-        ctk.CTkLabel(left, text="Enroll Resident Fingerprint",
-                     font=font_tuple("heading"), text_color=TEXT_PRIMARY).pack(
-                         anchor="w", pady=(0, s(16)))
-
-        form = ctk.CTkFrame(left, fg_color=BG, border_width=s(1),
-                            border_color=CARD_BORDER, corner_radius=s(12))
-        form.pack(fill="x", pady=(0, s(12)))
-
-        ctk.CTkLabel(form, text="Resident UID", font=font_tuple("small_bold"),
-                     text_color=TEXT_SECONDARY).pack(
-                         anchor="w", padx=s(20), pady=(s(16), s(4)))
-        self._enroll_uid = ctk.CTkEntry(
-            form, placeholder_text="Firebase user UID",
-            font=font_tuple("body"), height=s(40), corner_radius=s(8))
-        self._enroll_uid.pack(fill="x", padx=s(20), pady=(0, s(12)))
-
-        ctk.CTkLabel(form, text="Template Slot", font=font_tuple("small_bold"),
-                     text_color=TEXT_SECONDARY).pack(
-                         anchor="w", padx=s(20), pady=(0, s(4)))
-        slot_frame = ctk.CTkFrame(form, fg_color="transparent")
-        slot_frame.pack(fill="x", padx=s(20), pady=(0, s(16)))
-        self._enroll_slot = ctk.CTkEntry(
-            slot_frame, placeholder_text="1-127",
-            font=font_tuple("body"), width=s(100), height=s(40),
-            corner_radius=s(8))
-        self._enroll_slot.pack(side="left")
-        self._enroll_slot.insert(0, "1")
-
-        self._enroll_btn = ctk.CTkButton(
-            form, text="Start Enrollment", font=font_tuple("body_bold"),
-            fg_color=PRIMARY, hover_color=PRIMARY_DARK,
-            height=s(44), corner_radius=s(10),
-            command=self._start_enroll)
-        self._enroll_btn.pack(padx=s(20), pady=(0, s(20)))
-
-        # Instructions
-        right = ctk.CTkFrame(frame, fg_color="transparent")
-        right.pack(side="right", fill="both", expand=True, padx=(s(10), 0))
-
-        ctk.CTkLabel(right, text="Instructions",
-                     font=font_tuple("heading"), text_color=TEXT_PRIMARY).pack(
-                         anchor="w", pady=(0, s(12)))
-
-        steps = [
-            "1. Enter the resident's Firebase UID",
-            "2. Choose a template slot (1-127)",
-            "3. Press 'Start Enrollment'",
-            "4. Place finger when prompted",
-            "5. Remove finger when prompted",
-            "6. Place same finger again",
-            "7. Template saved automatically",
-        ]
-        for step in steps:
-            ctk.CTkLabel(right, text=step, font=font_tuple("body"),
-                         text_color=TEXT_SECONDARY, anchor="w",
-                         justify="left").pack(fill="x", pady=s(3))
-
-        # Status area
-        self._enroll_status = ctk.CTkLabel(
-            frame, text="", font=font_tuple("body"), text_color=TEXT_PRIMARY)
-        self._enroll_status.pack(fill="x", pady=(s(8), 0))
-
-    def _start_enroll(self):
-        uid = self._enroll_uid.get().strip()
-        slot_str = self._enroll_slot.get().strip()
-
-        if not uid:
-            self._enroll_status.configure(text="Please enter User UID",
-                                          text_color=ERROR)
-            return
-
-        try:
-            slot = int(slot_str)
-            if slot < 1 or slot > 127:
-                raise ValueError
-        except ValueError:
-            self._enroll_status.configure(
-                text="Slot must be a number 1-127", text_color=ERROR)
-            return
-
-        self._enroll_btn.configure(state="disabled", text="Enrolling...")
-        self._enroll_status.configure(text="Starting enrollment...",
-                                      text_color=PRIMARY)
-
-        def do_enroll():
-            try:
-                self.after(0, lambda: self._enroll_status.configure(
-                    text="Place finger on the scanner...", text_color=PRIMARY))
-                success, data = self.serial_handler.enroll_fingerprint(slot)
-
-                if success:
-                    # Update Firebase with template_id
-                    self._update_firebase_fingerprint(uid, slot, data)
-                    self.after(0, lambda: self._enroll_status.configure(
-                        text=f"✓ Enrolled! Template {slot} saved.",
-                        text_color=SUCCESS))
-                else:
-                    self.after(0, lambda: self._enroll_status.configure(
-                        text=f"✗ Enrollment failed: {data}",
-                        text_color=ERROR))
-            except Exception as e:
-                self.after(0, lambda: self._enroll_status.configure(
-                    text=f"✗ Error: {e}", text_color=ERROR))
-            finally:
-                self.after(0, lambda: self._enroll_btn.configure(
-                    state="normal", text="Start Enrollment"))
-
-        threading.Thread(target=do_enroll, daemon=True).start()
-
-    def _update_firebase_fingerprint(self, uid: str, slot: int,
-                                     data: str):
-        """Update Firebase user record with enrolled template ID."""
-        try:
-            template_id = slot
-            if data and data.isdigit():
-                template_id = int(data)
-            self.firebase.update_child(f"users/{uid}", {
-                "fingerprint_template_id": template_id,
-                "fingerprint_enrolled": True,
-            })
-        except Exception as e:
-            self.after(0, lambda: self._enroll_status.configure(
-                text=f"Enrolled but Firebase update failed: {e}",
-                text_color=WARNING))
 
     # ── Status Tab ──
 
