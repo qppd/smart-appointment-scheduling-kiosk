@@ -25,6 +25,8 @@ export default function Booking() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthChange((u) => {
@@ -47,6 +49,27 @@ export default function Booking() {
   }, [authChecking]);
 
   const slots = selectedService ? generateSlots(selectedService.duration_minutes) : [];
+  const availableSlots = slots.filter(s => !bookedSlots.has(s));
+
+  const checkAvailability = async (date: string, serviceId: string) => {
+    setCheckingAvailability(true);
+    try {
+      const snap = await get(ref(db, 'appointments'));
+      const data = snap.val() || {};
+      const booked = new Set<string>();
+      (Object.entries(data) as [string, any][]).forEach(([, a]) => {
+        if (a.appointment_date === date && a.service_id === serviceId && a.status !== 'cancelled') {
+          booked.add(`${a.start_time} - ${a.end_time}`);
+        }
+      });
+      setBookedSlots(booked);
+    } catch (err) {
+      console.error('Availability check error:', err);
+      setBookedSlots(new Set());
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
 
   const book = async () => {
     if (!selectedService || !selectedDate || !selectedSlot || !user) return;
@@ -54,8 +77,10 @@ export default function Booking() {
     try {
       const snap = await get(ref(db, 'appointments'));
       const data = snap.val() || {};
-      const existing = Object.entries(data).filter(([, a]: [string, any]) => a.appointment_date === selectedDate && a.service_id === selectedService.id);
+      const existing = Object.entries(data).filter(([, a]: [string, any]) => a.appointment_date === selectedDate && a.service_id === selectedService.id && a.status !== 'cancelled');
       if (existing.length >= selectedService.slot_capacity_per_day) { setError('No slots available for this date.'); setLoading(false); return; }
+      const slotTaken = existing.some(([, a]: [string, any]) => `${a.start_time} - ${a.end_time}` === selectedSlot);
+      if (slotTaken) { setError('This time slot was just booked by another user. Please select a different time.'); setLoading(false); return; }
       const [start, end] = selectedSlot.split(' - ');
       const result = await createAppointment({
         resident_id: user.uid, service_id: selectedService.id, service_name: selectedService.name,
@@ -159,7 +184,7 @@ export default function Booking() {
           <button onClick={() => setStep('service')} className="flex items-center text-gray-500 hover:text-gray-700 mb-4"><ArrowLeft className="h-4 w-4 mr-1"/>Back</button>
           <h2 className="text-xl font-bold mb-4">Select Date</h2>
           <input type="date" min={new Date().toISOString().split('T')[0]} value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg" />
-          <button onClick={() => selectedDate && setStep('time')} className="mt-4 w-full bg-teal-600 text-white py-3 rounded-lg font-semibold" disabled={!selectedDate}>Continue</button>
+          <button onClick={async () => { if (selectedDate) { await checkAvailability(selectedDate, selectedService.id); setStep('time'); } }} className="mt-4 w-full bg-teal-600 text-white py-3 rounded-lg font-semibold" disabled={!selectedDate}>Continue</button>
         </div>
       )}
 
@@ -167,7 +192,18 @@ export default function Booking() {
         <div>
           <button onClick={() => setStep('date')} className="flex items-center text-gray-500 hover:text-gray-700 mb-4"><ArrowLeft className="h-4 w-4 mr-1"/>Back</button>
           <h2 className="text-xl font-bold mb-4">Select Time</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">{slots.map(s => <button key={s} onClick={() => { setSelectedSlot(s); setStep('confirm'); }} className={`p-3 rounded-lg text-center border text-sm font-medium ${selectedSlot === s ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-700 border-gray-200 hover:border-teal-500'}`}>{s}</button>)}</div>
+          {checkingAvailability ? (
+            <div className="text-center py-12"><Loader2 className="h-8 w-8 animate-spin text-teal-600 mx-auto" /><p className="text-gray-500 mt-4">Checking availability...</p></div>
+          ) : availableSlots.length === 0 ? (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+              <AlertCircle className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
+              <p className="text-yellow-800 font-medium">No time slots available</p>
+              <p className="text-yellow-700 text-sm mt-1">All time slots for this date are fully booked. Please select a different date.</p>
+              <button onClick={() => setStep('date')} className="mt-4 text-yellow-800 underline text-sm">Go back to date selection</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">{availableSlots.map(s => <button key={s} onClick={() => { setSelectedSlot(s); setStep('confirm'); }} className={`p-3 rounded-lg text-center border text-sm font-medium ${selectedSlot === s ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-700 border-gray-200 hover:border-teal-500'}`}>{s}</button>)}</div>
+          )}
         </div>
       )}
 
