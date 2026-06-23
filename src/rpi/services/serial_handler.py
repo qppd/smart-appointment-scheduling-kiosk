@@ -59,15 +59,19 @@ class SerialHandler:
                 self.ser.flush()  # Ensure data is sent
 
                 start = time.time()
-                response = ""
                 while time.time() - start < timeout:
                     raw = self.ser.readline()
-                    if raw:
-                        response = raw.decode('utf-8', errors='replace').strip()
-                        if response:
-                            break
-                    time.sleep(0.01)
-                return response if response else "ERR:No response"
+                    if not raw:
+                        time.sleep(0.01)
+                        continue
+                    line = raw.decode('utf-8', errors='replace').strip()
+                    if not line:
+                        continue
+                    # Skip debug lines — they are diagnostics, not command results
+                    if line.startswith("[DEBUG]"):
+                        continue
+                    return line
+                return "ERR:No response"
             except PermissionError as e:
                 print(f"[SERIAL] Permission error (device busy): {e}")
                 return f"ERR:PermissionError - device busy"

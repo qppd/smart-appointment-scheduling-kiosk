@@ -244,21 +244,17 @@ bool handleAutoEnroll() {
 // Verify fingerprint (one-shot)
 // ---------------------------------------------------------------------------
 void handleVerify() {
-  Serial.println("OK:Place finger on sensor for verification");
+  Serial.println("[DEBUG] Verify: place finger on sensor");
 
   int id = fpSensor.authenticate();
 
   if (id >= 0) {
-    Serial.print("[DEBUG] Authentication successful! User ID: ");
-    Serial.println(id);
     char response[32];
     snprintf(response, sizeof(response), "FP_MATCH:%d", id);
     Serial.println(response);
   } else if (id == -2) {
-    Serial.println("[DEBUG] Authentication failed - no match found");
     Serial.println("FP_NO_MATCH");
   } else {
-    Serial.println("[DEBUG] Authentication error");
     Serial.println("ERR:Verify failed");
   }
 }
@@ -267,21 +263,17 @@ void handleVerify() {
 // Search for fingerprint (detailed / one-shot)
 // ---------------------------------------------------------------------------
 void handleSearch() {
-  Serial.println("OK:Searching...");
+  Serial.println("[DEBUG] Searching...");
 
   int id = fpSensor.search();
 
   if (id > 0) {
-    Serial.print("[DEBUG] Found match - User ID: ");
-    Serial.println(id);
     char response[32];
     snprintf(response, sizeof(response), "FP_MATCH:%d", id);
     Serial.println(response);
   } else if (id == 0) {
-    Serial.println("[DEBUG] No match found in database");
     Serial.println("FP_NO_MATCH");
   } else {
-    Serial.println("[DEBUG] Search error or no finger detected");
     Serial.println("ERR:Search failed");
   }
 }
