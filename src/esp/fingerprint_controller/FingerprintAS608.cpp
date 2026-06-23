@@ -44,61 +44,105 @@ int FingerprintAS608::authenticate() {
   }
 }
 
-bool FingerprintAS608::enroll(uint16_t id) {
+bool FingerprintAS608::enroll(uint16_t id, unsigned long timeoutMs) {
   if (id == 0) {
     return false;
   }
 
   int p = -1;
+  unsigned long deadline = millis() + timeoutMs;
 
-  while (p != FINGERPRINT_OK) {
+  // Step 1: Get first fingerprint image
+  while (millis() < deadline) {
     p = _finger.getImage();
     if (p == FINGERPRINT_OK) {
-      // Image taken
+      Serial.println("[FingerprintAS608] First image taken");
+      break;
     } else if (p == FINGERPRINT_NOFINGER) {
       delay(100);
     } else {
+      Serial.println("[FingerprintAS608] Error capturing first image");
       return false;
     }
   }
+  if (p != FINGERPRINT_OK) {
+    Serial.println("[FingerprintAS608] Timed out waiting for first finger");
+    return false;
+  }
 
+  // Convert first image to template 1
   p = _finger.image2Tz(1);
   if (p != FINGERPRINT_OK) {
+    Serial.println("[FingerprintAS608] Failed to convert first image");
     return false;
   }
+  Serial.println("[FingerprintAS608] First image converted");
 
+  // Step 2: Wait for finger removal
+  Serial.println("[FingerprintAS608] Remove finger");
+  deadline = millis() + timeoutMs;
   delay(2000);
   p = 0;
-  while (p != FINGERPRINT_NOFINGER) {
+  while (millis() < deadline && p != FINGERPRINT_NOFINGER) {
     p = _finger.getImage();
   }
 
+  // Step 3: Get second fingerprint image
+  Serial.println("[FingerprintAS608] Place same finger again");
+  deadline = millis() + timeoutMs;
   p = -1;
-  while (p != FINGERPRINT_OK) {
+  while (millis() < deadline) {
     p = _finger.getImage();
     if (p == FINGERPRINT_OK) {
-      // Image taken
+      Serial.println("[FingerprintAS608] Second image taken");
+      break;
     } else if (p == FINGERPRINT_NOFINGER) {
       delay(100);
     } else {
+      Serial.println("[FingerprintAS608] Error capturing second image");
       return false;
     }
   }
+  if (p != FINGERPRINT_OK) {
+    Serial.println("[FingerprintAS608] Timed out waiting for second finger");
+    return false;
+  }
 
+  // Convert second image to template 2
   p = _finger.image2Tz(2);
   if (p != FINGERPRINT_OK) {
+    Serial.println("[FingerprintAS608] Failed to convert second image");
     return false;
   }
+  Serial.println("[FingerprintAS608] Second image converted");
 
+  // Step 4: Create model from both templates
+  Serial.println("[FingerprintAS608] Creating model...");
   p = _finger.createModel();
-  if (p != FINGERPRINT_OK) {
+  if (p == FINGERPRINT_OK) {
+    Serial.println("[FingerprintAS608] Prints matched!");
+  } else if (p == FINGERPRINT_ENROLLMISMATCH) {
+    Serial.println("[FingerprintAS608] Fingerprints did not match");
+    return false;
+  } else {
+    Serial.println("[FingerprintAS608] Error creating model");
     return false;
   }
 
+  // Step 5: Store the model
   p = _finger.storeModel(id);
   if (p == FINGERPRINT_OK) {
+    Serial.print("[FingerprintAS608] Stored! ID #");
+    Serial.println(id);
     return true;
+  } else if (p == FINGERPRINT_BADLOCATION) {
+    Serial.println("[FingerprintAS608] Could not store in that location");
+    return false;
+  } else if (p == FINGERPRINT_FLASHERR) {
+    Serial.println("[FingerprintAS608] Error writing to flash");
+    return false;
   } else {
+    Serial.println("[FingerprintAS608] Unknown storage error");
     return false;
   }
 }

@@ -202,32 +202,14 @@ bool handleEnroll(uint16_t id) {
   Serial.print("[DEBUG] Starting enrollment for ID #");
   Serial.println(id);
   Serial.println("OK:Place finger on sensor");
+  Serial.println("OK:Hold still...");
 
-  unsigned long timeout = millis() + 30000; // 30 second timeout
-  bool fingerPlaced = false;
-
-  // Step 1: Wait for finger to be placed
-  while (millis() < timeout) {
-    if (fpSensor.isFingerDetected()) {
-      fingerPlaced = true;
-      Serial.println("OK:Hold still...");
-      delay(500); // Give time to settle
-      break;
-    }
-    delay(100);
-  }
-
-  if (!fingerPlaced) {
-    Serial.println("ERR:Enrollment timeout - no finger detected");
-    return false;
-  }
-
-  // Use the library's blocking enroll which handles:
-  // - First image capture
+  // Call the library's blocking enroll which handles:
+  // - First image capture (with timeout)
   // - Remove finger prompt
-  // - Second image capture
+  // - Second image capture (with timeout)
   // - Model creation and storage
-  if (fpSensor.enroll(id)) {
+  if (fpSensor.enroll(id, 30000)) {
     Serial.print("[DEBUG] Enrollment successful! ID #");
     Serial.println(id);
     char response[32];

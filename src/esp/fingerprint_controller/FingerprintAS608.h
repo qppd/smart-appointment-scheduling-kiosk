@@ -13,8 +13,9 @@ public:
   void begin();
   bool verifySensor();
   int getTemplateCount();
-  // Enroll a finger to an ID (blocking, returns true on success)
-  bool enroll(uint16_t id);
+  // Enroll a finger to an ID (blocking, returns true on success).
+  // timeoutMs is the max time to wait for each finger placement step (default 30s).
+  bool enroll(uint16_t id, unsigned long timeoutMs = 30000);
   // Delete a fingerprint by ID, returns true on success
   bool deleteFingerprint(uint16_t id);
   // Empty the entire fingerprint database, returns true on success
