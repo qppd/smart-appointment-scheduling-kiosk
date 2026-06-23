@@ -157,44 +157,86 @@ class OTPEnrollScreen(ctk.CTkFrame):
 
     def _do_verify(self):
         try:
-            from datetime import datetime, timezone
-            today_local = datetime.now().strftime("%Y-%m-%d")
+            from datetime import datetime, timezone, timedelta
+
+            now = datetime.now()
+            today_local = now.strftime("%Y-%m-%d")
             today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            rpi_now_str = now.isoformat()
+
             all_appts = self.firebase.get_child("appointments") or {}
+            all_count = len(all_appts) if isinstance(all_appts, dict) else 0
+            print(f"[OTP] Checking OTP='{self._otp}' against {all_count} appointments. RPi time={rpi_now_str}, today_local={today_local}, today_utc={today_utc}")
+
             matched = None
             matched_uid = None
+            checked = 0
             for apt_id, apt in all_appts.items():
                 if not isinstance(apt, dict):
                     continue
-                apt_otp = str(apt.get("enrollment_otp", ""))
-                apt_date = apt.get("appointment_date", "")
-                apt_status = apt.get("status", "")
-                # Match OTP exactly, and date (allow local or UTC date)
-                if (apt_otp == self._otp
-                        and apt_status == "scheduled"
-                        and (apt_date == today_local or apt_date == today_utc)):
-                    # Check expiry - be lenient with timezone issues
-                    exp = apt.get("enrollment_otp_expires_at")
-                    if exp:
-                        try:
-                            exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
-                            now_utc = datetime.now(timezone.utc)
-                            # Add 1 hour buffer for timezone issues
-                            if exp_dt < now_utc:
-                                print(f"[OTP] Expired: {exp_dt} < {now_utc}")
-                                continue
-                        except (ValueError, TypeError):
-                            pass
-                    # Check already consumed
-                    if apt.get("enrollment_otp_consumed_at"):
-                        continue
-                    matched = dict(apt)
-                    matched["id"] = apt_id
-                    matched_uid = apt.get("resident_id")
-                    break
+                checked += 1
+                apt_otp_raw = apt.get("enrollment_otp", "")
+                apt_otp = str(apt_otp_raw)
+                apt_date = str(apt.get("appointment_date", ""))
+                apt_status = str(apt.get("status", ""))
+                exp = apt.get("enrollment_otp_expires_at")
+                consumed = apt.get("enrollment_otp_consumed_at")
+
+                print(f"[OTP] Appt {apt_id}: otp='{apt_otp}', status='{apt_status}', date='{apt_date}', exp='{exp}', consumed='{consumed}'")
+
+                # Match OTP exactly
+                if apt_otp != self._otp:
+                    print(f"[OTP]   -> OTP mismatch: '{apt_otp}' != '{self._otp}'")
+                    continue
+
+                # Match status
+                if apt_status != "scheduled":
+                    print(f"[OTP]   -> Status mismatch: '{apt_status}' != 'scheduled'")
+                    continue
+
+                # Match date: allow today (local or UTC) or any future date
+                # Future appointments should still allow fingerprint enrollment
+                valid_dates = {today_local, today_utc}
+                date_ok = apt_date in valid_dates
+                # If date doesn't match today, check if it's a future valid date
+                try:
+                    apt_dt = datetime.strptime(apt_date, "%Y-%m-%d")
+                    date_ok = date_ok or apt_dt.date() >= now.date()
+                except (ValueError, TypeError):
+                    pass
+
+                if not date_ok:
+                    print(f"[OTP]   -> Date mismatch: '{apt_date}' not in {valid_dates} and not future")
+                    continue
+
+                # Check expiry
+                if exp:
+                    try:
+                        exp_str = exp.replace("Z", "+00:00") if isinstance(exp, str) else str(exp)
+                        exp_dt = datetime.fromisoformat(exp_str)
+                        now_utc = datetime.now(timezone.utc)
+                        # Allow up to 1 hour past expiry to tolerate clock skew
+                        if exp_dt < now_utc - timedelta(hours=1):
+                            print(f"[OTP]   -> Expired: expires={exp_dt}, now={now_utc}")
+                            continue
+                    except (ValueError, TypeError) as parse_err:
+                        print(f"[OTP]   -> Could not parse expiry '{exp}': {parse_err}")
+                        pass
+
+                # Check consumed
+                if consumed:
+                    print(f"[OTP]   -> Already consumed at '{consumed}'")
+                    continue
+
+                # Match found
+                print(f"[OTP]   -> MATCHED appointment {apt_id}")
+                matched = dict(apt)
+                matched["id"] = apt_id
+                matched_uid = apt.get("resident_id")
+                break
 
             if not matched:
-                print(f"[OTP] No match for OTP={self._otp}, today_local={today_local}, today_utc={today_utc}")
+                print(f"[OTP] No match found after checking {checked} appointments")
                 self.after(0, lambda: self._error_label.configure(
                     text="Invalid or expired code. Check your My Appointments page."))
                 self.after(0, lambda: self._status_label.configure(
