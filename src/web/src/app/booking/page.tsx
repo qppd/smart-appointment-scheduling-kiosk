@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ref, get } from 'firebase/database';
+import { ref, get, child } from 'firebase/database';
 import { onAuthChange, getUserData } from '@/lib/auth';
-import { subscribeServices, createAppointment } from '@/lib/rtdb';
+import { subscribeServices, createAppointment, regenerateEnrollmentOTP } from '@/lib/rtdb';
 import { db } from '@/lib/firebase';
 import type { Service } from '@/types';
-import { ArrowLeft, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 export default function Booking() {
   const router = useRouter();
@@ -18,6 +18,9 @@ export default function Booking() {
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [appointmentId, setAppointmentId] = useState('');
+  const [enrollmentOtp, setEnrollmentOtp] = useState('');
+  const [otpExpiresAt, setOtpExpiresAt] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -26,10 +29,7 @@ export default function Booking() {
   useEffect(() => {
     const unsub = onAuthChange((u) => {
       setAuthChecking(false);
-      if (!u) {
-        router.push('/login');
-        return;
-      }
+      if (!u) { router.push('/login'); return; }
       setUser(u);
       getUserData(u.uid).then((data) => {
         if (data?.role === 'admin') {
@@ -57,15 +57,41 @@ export default function Booking() {
       const existing = Object.entries(data).filter(([, a]: [string, any]) => a.appointment_date === selectedDate && a.service_id === selectedService.id);
       if (existing.length >= selectedService.slot_capacity_per_day) { setError('No slots available for this date.'); setLoading(false); return; }
       const [start, end] = selectedSlot.split(' - ');
-      const id = await createAppointment({
+      const result = await createAppointment({
         resident_id: user.uid, service_id: selectedService.id, service_name: selectedService.name,
         appointment_date: selectedDate, start_time: start, end_time: end,
         status: 'scheduled', queue_number: existing.length + 1, verified_by_fingerprint: false,
       });
-      setAppointmentId(id);
+
+      let id = result?.id || '';
+      let otp = result?.otp || '';
+
+      if ((!otp || !id) && id) {
+        try {
+          const remote = await get(child(ref(db, 'appointments'), id));
+          const v = remote.val();
+          if (v) { otp = otp || v.enrollment_otp || ''; setOtpExpiresAt(v.otp_expires_at || null); }
+        } catch {}
+      }
+
+      setAppointmentId(id || '');
+      setEnrollmentOtp(otp || '');
       setStep('done');
     } catch (err) { console.error('Booking error:', err); setError('Failed to book. Try again.'); }
     finally { setLoading(false); }
+  };
+
+  const regenerateCode = async () => {
+    if (!appointmentId) return;
+    setRegenerating(true);
+    try {
+      const { otp, expires_at } = await regenerateEnrollmentOTP(appointmentId);
+      setEnrollmentOtp(otp);
+      setOtpExpiresAt(expires_at);
+    } catch (err) {
+      console.error('Regenerate error:', err);
+      alert('Failed to regenerate code. Please try again.');
+    } finally { setRegenerating(false); }
   };
 
   if (authChecking) {
@@ -77,9 +103,7 @@ export default function Booking() {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) { return null; }
 
   if (step === 'done') {
     return (
@@ -87,6 +111,21 @@ export default function Booking() {
         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle className="h-10 w-10 text-green-600" /></div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Appointment Booked!</h2>
         <p className="text-gray-500 mb-6">Your appointment has been confirmed.</p>
+
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-6 mb-6 max-w-md mx bookmarkable">
+          <p className="text-amber-800 font-medium mb-2">Your Enrollment Code</p>
+          <p className="text-4xl font-bold text-amber-900 tracking-widest">{enrollmentOtp || '------'}</p>
+          <p className="text-amber-700 text-sm mt-2">Present this code at the kiosk to enroll your fingerprint.</p>
+          {otpExpiresAt && (
+            <p className="text-amber-600 text-xs mt-2">Expires: {new Date(otpExpiresAt).toLocaleString()}</p>
+          )}
+          <button onClick={regenerateCode} disabled={regenerating}
+            className="mt-3 inline-flex items-center gap-1 text-sm text-amber-800 hover:text-amber-900 underline disabled:opacity-50">
+            <RefreshCw className={regenerating ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} />
+            {regenerating ? 'Generating...' : 'I lost my code — generate a new one'}
+          </button>
+        </div>
+
         <Link href="/my-appointments" className="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700">View My Appointments</Link>
       </div>
     );

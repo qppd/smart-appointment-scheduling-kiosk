@@ -33,14 +33,40 @@ export function subscribeMyAppointments(residentId: string, callback: (appointme
   });
 }
 
-export async function createAppointment(data: Omit<Appointment, 'id' | 'created_at'>): Promise<string> {
+export function generateEnrollmentOTP(): { otp: string; expires_at: string } {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h expiry
+  return { otp, expires_at: expiresAt };
+}
+
+export async function createAppointment(
+  data: Omit<Appointment, 'id' | 'created_at' | 'enrollment_otp' | 'enrollment_otp_expires_at' | 'enrollment_otp_consumed_at'>
+): Promise<{ id: string; otp: string }> {
+  const { otp, expires_at } = generateEnrollmentOTP();
   const newRef = push(ref(db, 'appointments'));
-  await set(newRef, { ...data, created_at: new Date().toISOString() });
-  return newRef.key!;
+  await set(newRef, {
+    ...data,
+    enrollment_otp: otp,
+    enrollment_otp_expires_at: expires_at,
+    created_at: new Date().toISOString(),
+  });
+  return { id: newRef.key!, otp };
 }
 
 export async function cancelAppointment(appointmentId: string) {
   await update(ref(db, `appointments/${appointmentId}`), { status: 'cancelled' });
+}
+
+export async function regenerateEnrollmentOTP(
+  appointmentId: string
+): Promise<{ otp: string; expires_at: string }> {
+  const { otp, expires_at } = generateEnrollmentOTP();
+  await update(ref(db, `appointments/${appointmentId}`), {
+    enrollment_otp: otp,
+    enrollment_otp_expires_at: expires_at,
+    enrollment_otp_consumed_at: null,
+  });
+  return { otp, expires_at };
 }
 
 export function subscribeTodayAppointments(callback: (appointments: Appointment[]) => void) {

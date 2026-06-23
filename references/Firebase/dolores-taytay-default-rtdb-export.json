@@ -1,0 +1,80 @@
+{
+  "appointments": {
+    "-OvLyCgveqc0QIVZOPZ5": {
+      "appointment_date": "2026-06-19",
+      "created_at": "2026-06-17T19:04:55.328Z",
+      "end_time": "09:00",
+      "queue_number": 1,
+      "resident_id": "BdaCtxjpdhevIfRnDcMayo86Jnv2",
+      "service_id": "-OvLu-hHKTXBRk9P-bh5",
+      "service_name": "Barangay Clearance",
+      "start_time": "08:55",
+      "status": "scheduled",
+      "verified_by_fingerprint": false
+    }
+  },
+  "kiosk_status": {
+    "default": {
+      "esp32_connected": true,
+      "last_heartbeat": 1782133302442,
+      "online": true,
+      "template_count": 0,
+      "updated_at": "2026-06-22T21:01:42.442549Z"
+    }
+  },
+  "services": {
+    "-OvLu-hHKTXBRk9P-bh5": {
+      "created_at": "2026-06-17T18:46:33.408Z",
+      "department": "",
+      "description": "Requirements: Cedula, Birth Certificate",
+      "duration_minutes": 5,
+      "is_active": true,
+      "name": "Barangay Clearance",
+      "slot_capacity_per_day": 30
+    }
+  },
+  "users": {
+    "BdaCtxjpdhevIfRnDcMayo86Jnv2": {
+      "address": "136 Sitio Crossing",
+      "birth_date": "1995-05-07",
+      "created_at": "2026-06-17T16:56:33.235Z",
+      "email": "quezon.province.pd@gmail.com",
+      "fingerprint_enrolled": false,
+      "first_name": "Sajed",
+      "last_name": "Mendoza",
+      "middle_name": "Lopez",
+      "phone": "09634905586",
+      "role": "admin",
+      "status": "pending",
+      "uid": "BdaCtxjpdhevIfRnDcMayo86Jnv2"
+    },
+    "NiYZjXxEpEhbSoDgF8wgOoCQNdO2": {
+      "address": "San Lorenzo Ruiz, Phase 1, Blk 38 Lot 28",
+      "birth_date": "2001-11-11",
+      "created_at": "2026-06-17T18:41:30.593Z",
+      "email": "genshinimpact00@yahoo.com",
+      "fingerprint_enrolled": false,
+      "first_name": "Admin",
+      "last_name": "Benedicto",
+      "middle_name": "",
+      "phone": "09271831800",
+      "role": "admin",
+      "status": "pending",
+      "uid": "NiYZjXxEpEhbSoDgF8wgOoCQNdO2"
+    },
+    "rd5HSBucxUeDeoF1tnOWEjoMsqw1": {
+      "address": "136 Sitio Crossing",
+      "birth_date": "1995-05-07",
+      "created_at": "2026-06-18T11:59:04.428Z",
+      "email": "sajedhm@gmail.com",
+      "fingerprint_enrolled": false,
+      "first_name": "Sajed",
+      "last_name": "Mendoza",
+      "middle_name": "Lopez ",
+      "phone": "09634905586",
+      "role": "resident",
+      "status": "pending",
+      "uid": "rd5HSBucxUeDeoF1tnOWEjoMsqw1"
+    }
+  }
+}

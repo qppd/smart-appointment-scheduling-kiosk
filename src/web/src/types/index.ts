@@ -44,6 +44,9 @@ export interface Appointment {
   queue_number: number;
   notes?: string;
   verified_by_fingerprint: boolean;
+  enrollment_otp?: string;
+  enrollment_otp_expires_at?: string;
+  enrollment_otp_consumed_at?: string;
   created_at: string;
 }
 
