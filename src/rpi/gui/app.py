@@ -38,6 +38,7 @@ from gui.screens.result import ResultScreen
 from gui.screens.admin import AdminScreen
 from gui.screens.enroll import EnrollScreen
 from gui.screens.otp_enroll import OTPEnrollScreen
+from gui.virtual_keyboard import VirtualKeyboard
 
 
 FIREBASE_CONFIG = {
@@ -218,9 +219,38 @@ class KioskApp(ctk.CTk):
         threading.Thread(target=self._appointments_loop, daemon=True).start()
         threading.Thread(target=self._token_refresh_loop, daemon=True).start()
 
+        # Virtual keyboard — must be placed above everything else
+        self.keyboard = VirtualKeyboard(self, on_close=self._hide_keyboard)
+        self._keyboard_active_entry = None
+
+        # Bind keyboard to admin PIN entry (and any other entries on screens)
+        for attr in ('_pin_entry',):
+            entry = getattr(self.admin_screen, attr, None)
+            if entry is not None:
+                self.bind_text_input(entry)
+
         # Poll ESP connection
         self.after(1500, self._check_serial_status)
         self.after(300, self._show_home)
+
+    def bind_text_input(self, entry_widget):
+        """Attach the virtual keyboard to a CTkEntry."""
+        if entry_widget is None:
+            return
+        entry_widget.bind("<FocusIn>", lambda e, w=entry_widget: self._show_keyboard(w))
+        entry_widget.bind("<FocusOut>", lambda e: self._on_focus_out())
+        entry_widget.bind("<Button-1>", lambda e, w=entry_widget: self._show_keyboard(w))
+
+    def _show_keyboard(self, entry_widget):
+        self._keyboard_active_entry = entry_widget
+        self.keyboard.show(entry_widget)
+
+    def _hide_keyboard(self):
+        self._keyboard_active_entry = None
+
+    def _on_focus_out(self):
+        # Don't hide on focus out since next entry might get focus immediately
+        pass
 
     # ---------- Resize handler ----------
     def _on_window_resize(self, event):
