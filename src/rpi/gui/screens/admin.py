@@ -399,8 +399,8 @@ class AdminScreen(ctk.CTkFrame):
             return "Error"
 
     def _get_fb_status(self):
-        token = self.firebase.fb_auth.id_token if self.firebase else None
-        return "Authenticated" if token else "Not Authenticated"
+        import firebase_admin
+        return "Authenticated" if (self.firebase and firebase_admin._apps) else "Not Authenticated"
 
     def _get_heartbeat(self):
         return "Active" if self.firebase else "Inactive"

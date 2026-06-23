@@ -15,14 +15,13 @@ import threading
 import time
 import traceback
 from datetime import datetime
-from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
 
 import customtkinter as ctk
-import pyrebase
-import requests
+import firebase_admin
+from firebase_admin import credentials, db
 
 from services.serial_handler import SerialHandler
 from services.command_processor import CommandProcessor
@@ -41,82 +40,24 @@ from gui.screens.otp_enroll import OTPEnrollScreen
 from gui.virtual_keyboard import VirtualKeyboard
 
 
-FIREBASE_CONFIG = {
-    "apiKey": os.environ.get("KIOSK_FIREBASE_API_KEY"),
-    "authDomain": os.environ.get("KIOSK_FIREBASE_AUTH_DOMAIN"),
-    "databaseURL": os.environ.get("KIOSK_FIREBASE_DATABASE_URL"),
-    "storageBucket": os.environ.get("KIOSK_FIREBASE_STORAGE_BUCKET"),
-}
-
-KIOSK_EMAIL = os.environ.get("KIOSK_EMAIL")
-KIOSK_PASSWORD = os.environ.get("KIOSK_PASSWORD")
+FIREBASE_DATABASE_URL = os.environ.get("KIOSK_FIREBASE_DATABASE_URL")
 SERIAL_PORT = os.environ.get("SERIAL_PORT", "/dev/ttyUSB0")
 SERIAL_BAUD = int(os.environ.get("SERIAL_BAUD", "115200"))
 
 
-class FirebaseAuthWrapper:
-    """Handle sign-in + token refresh."""
-    def __init__(self, auth):
-        self.auth = auth
-        self.id_token: Optional[str] = None
-        self.refresh_token: Optional[str] = None
-        self._sign_in()
-
-    def _sign_in(self):
-        user = self.auth.sign_in_with_email_and_password(KIOSK_EMAIL, KIOSK_PASSWORD)
-        self.id_token = user["idToken"]
-        self.refresh_token = user["refreshToken"]
-        print(f"[AUTH] Signed in as {KIOSK_EMAIL}")
-
-    def refresh_if_needed(self):
-        try:
-            user = self.auth.refresh(self.refresh_token)
-            self.id_token = user["idToken"]
-            print("[AUTH] Token refreshed")
-        except Exception as e:
-            print(f"[AUTH] Refresh failed ({e}), re-authenticating...")
-            self._sign_in()
-
-
 class FirebaseService:
-    """Thread-safe wrapper around pyrebase (pyrebase mutates self.path in-place)."""
-    def __init__(self, fb_auth: FirebaseAuthWrapper):
-        self.firebase = pyrebase.initialize_app(FIREBASE_CONFIG)
-        self.auth = self.firebase.auth()
-        self.db = self.firebase.database()
-        self.fb_auth = fb_auth
+    """Thread-safe wrapper around Firebase Admin SDK Realtime Database."""
+
+    def __init__(self):
         self._db_lock = threading.Lock()
 
-    def _call_with_refresh(self, fn):
-        """Execute fn under the DB lock, refresh token on 401, retry once."""
-        with self._db_lock:
-            try:
-                return fn()
-            except requests.exceptions.HTTPError as e:
-                if "401" not in str(e):
-                    raise
-        # Token may have expired — refresh outside the lock (network I/O)
-        self.fb_auth.refresh_if_needed()
-        with self._db_lock:
-            return fn()
-
-    def safe_get(self, path: str):
-        resp = self._call_with_refresh(lambda: self.db.get(self.fb_auth.id_token))
-        if resp:
-            return resp.val() or {}
-        return {}
-
     def get_child(self, path: str):
-        resp = self._call_with_refresh(
-            lambda: self.db.child(path).get(self.fb_auth.id_token))
-        if resp:
-            v = resp.val()
-            return v if isinstance(v, dict) else {}
-        return {}
+        with self._db_lock:
+            return db.reference(path).get() or {}
 
     def update_child(self, path: str, data: dict):
-        self._call_with_refresh(
-            lambda: self.db.child(path).update(data, self.fb_auth.id_token))
+        with self._db_lock:
+            db.reference(path).update(data)
 
 
 class KioskApp(ctk.CTk):
@@ -150,14 +91,12 @@ class KioskApp(ctk.CTk):
         # Backends (initialized before UI)
         self._firebase_ready = False
         try:
-            pyrebase_app = pyrebase.initialize_app(FIREBASE_CONFIG)
-            fb_auth = FirebaseAuthWrapper(pyrebase_app.auth())
-            self.fb_service = FirebaseService.__new__(FirebaseService)
-            self.fb_service.firebase = pyrebase_app
-            self.fb_service.auth = pyrebase_app.auth()
-            self.fb_service.db = pyrebase_app.database()
-            self.fb_service.fb_auth = fb_auth
-            self.fb_service._db_lock = threading.Lock()
+            cred = credentials.Certificate(
+                os.path.join(os.path.dirname(__file__), "..", "firebase-service-account.json"))
+            firebase_admin.initialize_app(cred, {
+                "databaseURL": FIREBASE_DATABASE_URL,
+            })
+            self.fb_service = FirebaseService()
             self._firebase_ready = True
             print("[FIREBASE] Connected and authenticated")
         except Exception as e:
@@ -217,8 +156,7 @@ class KioskApp(ctk.CTk):
         threading.Thread(target=self._heartbeat_loop, daemon=True).start()
         threading.Thread(target=self._commands_loop, daemon=True).start()
         threading.Thread(target=self._appointments_loop, daemon=True).start()
-        threading.Thread(target=self._token_refresh_loop, daemon=True).start()
-
+        
         # Virtual keyboard — must be placed above everything else
         self.keyboard = VirtualKeyboard(self, on_close=self._hide_keyboard)
         self._keyboard_active_entry = None
@@ -489,12 +427,4 @@ class KioskApp(ctk.CTk):
                 traceback.print_exc()
             time.sleep(5)
 
-    def _token_refresh_loop(self):
-        if not self.fb_service:
-            return
-        while self.running:
-            time.sleep(3000)
-            try:
-                self.fb_service.fb_auth.refresh_if_needed()
-            except Exception as e:
-                print(f"[AUTH] Refresh failed: {e}")
+    

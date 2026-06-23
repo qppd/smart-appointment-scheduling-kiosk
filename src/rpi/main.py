@@ -16,19 +16,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 if not all([
-    os.environ.get("KIOSK_FIREBASE_API_KEY"),
     os.environ.get("KIOSK_FIREBASE_DATABASE_URL"),
-    os.environ.get("KIOSK_EMAIL"),
-    os.environ.get("KIOSK_PASSWORD"),
 ]):
     print("[ERROR] Missing required environment variables. Check .env file.")
     sys.exit(1)
-
-if not all([
-    os.environ.get("KIOSK_FIREBASE_AUTH_DOMAIN"),
-    os.environ.get("KIOSK_FIREBASE_STORAGE_BUCKET"),
-]):
-    print("[WARN] Some optional FIREBASE config values missing.")
 
 try:
     from gui.app import KioskApp
