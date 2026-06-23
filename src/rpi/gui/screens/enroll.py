@@ -135,6 +135,22 @@ class EnrollScreen(ctk.CTkFrame):
         if not appt:
             return
 
+        # Defense-in-depth: refuse if user already has fingerprint enrolled
+        uid = appt.get("resident_id")
+        if uid and self.firebase:
+            try:
+                user_data = self.firebase.get_child(f"users/{uid}") or {}
+                if bool(user_data.get("fingerprint_enrolled")):
+                    self.after(0, lambda: self._error_label.configure(
+                        text="Your fingerprint is already enrolled. Tap to check in."))
+                    self.after(0, lambda: self._start_btn.configure(
+                        state="normal", text="Start Enrollment"))
+                    self.after(0, lambda: self._instruction.configure(
+                        text="No further enrollment is needed."))
+                    return
+            except Exception as e:
+                print(f"[ENROLL] User check error: {e}")
+
         # 1. Find free slot
         self.after(0, lambda: self._step_label.configure(
             text="Checking available slot..."))

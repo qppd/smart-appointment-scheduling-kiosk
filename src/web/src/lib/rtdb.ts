@@ -60,6 +60,18 @@ export async function cancelAppointment(appointmentId: string) {
 export async function regenerateEnrollmentOTP(
   appointmentId: string
 ): Promise<{ otp: string; expires_at: string }> {
+  // Guard: refuse if user already has fingerprint enrolled
+  const aptSnap = await get(ref(db, `appointments/${appointmentId}`));
+  if (aptSnap.exists()) {
+    const apt = aptSnap.val();
+    if (apt.resident_id) {
+      const userSnap = await get(ref(db, `users/${apt.resident_id}`));
+      if (userSnap.exists() && userSnap.val().fingerprint_enrolled) {
+        throw new Error('Fingerprint already enrolled. No new code is needed.');
+      }
+    }
+  }
+
   const { otp, expires_at } = generateEnrollmentOTP();
   await update(ref(db, `appointments/${appointmentId}`), {
     enrollment_otp: otp,

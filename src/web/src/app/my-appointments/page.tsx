@@ -5,7 +5,7 @@ import { onAuthChange, getUserData } from '@/lib/auth';
 import { subscribeMyAppointments, cancelAppointment, regenerateEnrollmentOTP } from '@/lib/rtdb';
 import type { Appointment } from '@/types';
 import { to12HourFormat } from '@/lib/utils';
-import { Calendar, XCircle, Loader2, RefreshCw } from 'lucide-react';
+import { Calendar, XCircle, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function MyAppointments() {
@@ -14,6 +14,7 @@ export default function MyAppointments() {
   const [loading, setLoading] = useState(true);
   const [authChecking, setAuthChecking] = useState(true);
   const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [alreadyEnrolled, setAlreadyEnrolled] = useState(false);
 
   useEffect(() => {
     let unsub: () => void;
@@ -28,6 +29,7 @@ export default function MyAppointments() {
           router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
           return;
         }
+        setAlreadyEnrolled(Boolean(data?.fingerprint_enrolled));
       });
       unsub = subscribeMyAppointments(user.uid, (apts) => {
         setAppointments(apts);
@@ -46,6 +48,10 @@ export default function MyAppointments() {
 
   const handleRegenerateOTP = async (apt: Appointment) => {
     if (!apt.id) return;
+    if (alreadyEnrolled) {
+      alert('Your fingerprint is already enrolled. No new code is needed.');
+      return;
+    }
     try {
       setRegenerating(apt.id);
       await regenerateEnrollmentOTP(apt.id);
@@ -110,7 +116,17 @@ export default function MyAppointments() {
                   {apt.status}
                 </span>
 
-                {showOTP && (
+                {alreadyEnrolled ? (
+                  <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 inline-block">
+                    <p className="text-green-800 text-xs font-medium flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Fingerprint already enrolled
+                    </p>
+                    <p className="text-green-700 text-xs mt-1">
+                      Use Tap-to-Check-In at the kiosk. No new code is needed.
+                    </p>
+                  </div>
+                ) : showOTP ? (
                   <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-block">
                     <p className="text-amber-800 text-xs font-medium">Enrollment Code</p>
                     <p className="text-xl font-bold text-amber-900 tracking-widest">
@@ -135,9 +151,7 @@ export default function MyAppointments() {
                       </button>
                     )}
                   </div>
-                )}
-
-                {!showOTP && canShowRegenerate && (
+                ) : canShowRegenerate ? (
                   <div className="mt-3">
                     <button
                       onClick={() => handleRegenerateOTP(apt)}
@@ -150,7 +164,7 @@ export default function MyAppointments() {
                         : "I don't have a code — generate one"}
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
 
               {apt.status === 'scheduled' && (
