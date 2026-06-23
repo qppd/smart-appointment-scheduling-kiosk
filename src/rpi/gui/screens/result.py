@@ -10,7 +10,7 @@ from gui.config import (
     BG, BG_SECONDARY, CARD_BORDER,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED,
     SUCCESS, SUCCESS_BG, ERROR, ERROR_BG,
-    s, font_tuple, RESULT_AUTO_RETURN,
+    s, font_tuple, RESULT_AUTO_RETURN, to_12_hour,
 )
 
 
@@ -46,7 +46,7 @@ class ResultScreen(ctk.CTkFrame):
         row_data = [
             ("Queue Number", f"#{data.get('queue_number', '--')}"),
             ("Service", data.get("service_name", "--")),
-            ("Time", data.get("start_time", "--")),
+            ("Time", to_12_hour(data.get("start_time", "--"))),
             ("Status", "Checked In"),
         ]
         for label, value in row_data:

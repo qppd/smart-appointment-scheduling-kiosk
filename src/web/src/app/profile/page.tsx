@@ -11,6 +11,7 @@ import {
   MapPin, Calendar as CalendarIcon, Shield, CheckCircle, X, Pencil, Save,
   Fingerprint, Briefcase,
 } from 'lucide-react';
+import { to12HourFormat } from '@/lib/utils';
 
 export default function Profile() {
   const router = useRouter();
@@ -307,7 +308,7 @@ export default function Profile() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900">{appt.service_name}</p>
-                            <p className="text-xs text-gray-500">{appt.appointment_date} - {appt.start_time}-{appt.end_time} - Queue #{appt.queue_number}</p>
+                            <p className="text-xs text-gray-500">{appt.appointment_date} - {to12HourFormat(appt.start_time)}-{to12HourFormat(appt.end_time)} - Queue #{appt.queue_number}</p>
                           </div>
                         </div>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[appt.status] || 'bg-gray-100 text-gray-600'}`}>

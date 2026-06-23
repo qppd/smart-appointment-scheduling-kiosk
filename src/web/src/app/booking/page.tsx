@@ -186,12 +186,18 @@ export default function Booking() {
   );
 }
 
+function to12HourStr(h: number, m: number): string {
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${displayH}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
 function generateSlots(duration: number): string[] {
   const slots: string[] = [];
   for (let t = 8 * 60; t + duration <= 17 * 60; t += duration) {
     const sH = Math.floor(t / 60), sM = t % 60;
     const eH = Math.floor((t + duration) / 60), eM = (t + duration) % 60;
-    slots.push(`${String(sH).padStart(2, '0')}:${String(sM).padStart(2, '0')} - ${String(eH).padStart(2, '0')}:${String(eM).padStart(2, '0')}`);
+    slots.push(`${to12HourStr(sH, sM)} - ${to12HourStr(eH, eM)}`);
   }
   return slots;
 }

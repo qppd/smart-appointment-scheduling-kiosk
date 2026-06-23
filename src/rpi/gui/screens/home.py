@@ -12,7 +12,7 @@ from gui.config import (
     BG, BG_SECONDARY, BG_GRAY, CARD_BORDER, CARD_BORDER_LIGHT,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_WHITE,
     SUCCESS, SUCCESS_BG, ERROR, ERROR_BG, WARNING, WARNING_BG,
-    s, font_tuple,
+    s, font_tuple, to_12_hour,
 )
 
 
@@ -347,7 +347,7 @@ class HomeScreen(ctk.CTkFrame):
 
         time_frame = ctk.CTkFrame(card, fg_color="transparent")
         time_frame.grid(row=0, column=3, sticky="e", padx=s(12))
-        ctk.CTkLabel(time_frame, text=a.get("start_time", "--"),
+        ctk.CTkLabel(time_frame, text=to_12_hour(a.get("start_time", "--")),
                      font=font_tuple("small"), text_color=TEXT_MUTED
                      ).pack(side="left", padx=(0, s(8)))
 

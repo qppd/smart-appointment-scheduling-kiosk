@@ -92,7 +92,7 @@ function KioskManagement() {
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900">
-              {status?.last_heartbeat ? new Date(status.last_heartbeat).toLocaleTimeString() : '—'}
+              {status?.last_heartbeat ? new Date(status.last_heartbeat).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '—'}
             </p>
             <p className="text-xs text-gray-500">Last Heartbeat</p>
           </div>

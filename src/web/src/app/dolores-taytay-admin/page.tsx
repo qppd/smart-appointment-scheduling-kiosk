@@ -18,6 +18,7 @@ import {
   UserCircle, Settings as SettingsIcon, LogOut, Shield, Loader2, AlertOctagon,
   Calendar, Fingerprint, CheckCircle, ArrowUp, ArrowDown,
 } from 'lucide-react';
+import { to12HourFormat } from '@/lib/utils';
 
 const ADMIN_EMAIL = 'quezon.province.pd@gmail.com';
 
@@ -707,7 +708,7 @@ Appointment System</p>
                 { key: 'appointment_date', label: 'Date', render: (a: Appointment) => a.appointment_date },
                 { key: 'resident_id', label: 'Resident ID' },
                 { key: 'service_name', label: 'Service' },
-                { key: 'start_time', label: 'Time', render: (a: Appointment) => `${a.start_time} - ${a.end_time}` },
+                { key: 'start_time', label: 'Time', render: (a: Appointment) => `${to12HourFormat(a.start_time)} - ${to12HourFormat(a.end_time)}` },
                 { key: 'queue_number', label: 'Queue #' ,
                   render: (a: Appointment) => `#${a.queue_number}`,
                   },

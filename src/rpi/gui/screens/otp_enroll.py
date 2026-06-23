@@ -12,7 +12,7 @@ from gui.config import (
     PRIMARY, PRIMARY_DARK, PRIMARY_LIGHT,
     BG, BG_SECONDARY, CARD_BORDER, CARD_BORDER_LIGHT,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_WHITE,
-    SUCCESS, ERROR, s, font_tuple,
+    SUCCESS, ERROR, s, font_tuple, to_12_hour,
 )
 
 
@@ -223,7 +223,7 @@ class OTPEnrollScreen(ctk.CTkFrame):
         self._result_name.configure(
             text=f"{self._matched_appointment.get('service_name', 'Appointment')} "
                  f"on {self._matched_appointment.get('appointment_date', '')} "
-                 f"at {self._matched_appointment.get('start_time', '')}")
+                 f"at {to_12_hour(self._matched_appointment.get('start_time', ''))}")
         self._result_service.configure(
             text=f"Resident: {self._matched_appointment.get('resident_first_name', '')} "
                  f"{self._matched_appointment.get('resident_last_name', '')}")

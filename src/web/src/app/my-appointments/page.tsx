@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { onAuthChange, getUserData } from '@/lib/auth';
 import { subscribeMyAppointments, cancelAppointment, regenerateEnrollmentOTP } from '@/lib/rtdb';
 import type { Appointment } from '@/types';
+import { to12HourFormat } from '@/lib/utils';
 import { Calendar, XCircle, Loader2, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -95,7 +96,7 @@ export default function MyAppointments() {
               <div>
                 <h3 className="font-semibold text-gray-900">{apt.service_name || 'Appointment'}</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  {apt.appointment_date} {apt.start_time}
+                  {apt.appointment_date} {to12HourFormat(apt.start_time)}
                 </p>
                 <span
                   className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-medium ${

@@ -88,3 +88,20 @@ HEARTBEAT_INTERVAL = 10000       # 10 seconds
 COMMAND_POLL_INTERVAL = 2000     # 2 seconds
 VERIFY_TIMEOUT = 30000           # 30 seconds
 RESULT_AUTO_RETURN = 10000       # 10 seconds
+
+
+def to_12_hour(time_str: str) -> str:
+    """Convert a 24-hour time string (e.g., '08:00') to 12-hour format (e.g., '8:00 AM')."""
+    if not time_str or " " in time_str:
+        return time_str
+    try:
+        h, m = time_str.split(":")
+        h = int(h)
+        suffix = "PM" if h >= 12 else "AM"
+        if h > 12:
+            h -= 12
+        elif h == 0:
+            h = 12
+        return f"{h}:{m} {suffix}"
+    except (ValueError, IndexError):
+        return time_str
