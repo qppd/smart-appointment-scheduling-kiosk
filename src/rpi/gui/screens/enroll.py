@@ -20,12 +20,14 @@ from gui.config import (
 
 class EnrollScreen(ctk.CTkFrame):
     def __init__(self, master, serial_handler, firebase_service,
-                 on_complete: callable, on_cancel: callable, **kwargs):
+                 on_complete: callable, on_cancel: callable,
+                 on_user_changed: callable | None = None, **kwargs):
         super().__init__(master, fg_color=BG, **kwargs)
         self.serial_handler = serial_handler
         self.firebase = firebase_service
         self.on_complete = on_complete
         self.on_cancel = on_cancel
+        self.on_user_changed = on_user_changed
         self._appointment = None
         self._running = False
         self._build_ui()
@@ -188,6 +190,19 @@ class EnrollScreen(ctk.CTkFrame):
                     "fingerprint_enrolled": True,
                     "fingerprint_enrolled_at": int(time.time() * 1000),
                 })
+                # Invalidate the kiosk's in-process user cache so the
+                # home queue reflects the new enrolled status on the
+                # next polling tick instead of waiting up to 60 s for
+                # the cache's natural refresh. Without this we keep
+                # serving stale "not enrolled" entries.
+                if self.on_user_changed:
+                    try:
+                        self.on_user_changed(uid, {
+                            "fingerprint_template_id": slot,
+                            "fingerprint_enrolled": True,
+                        })
+                    except Exception:
+                        pass
                 # Consume the OTP so it can't be reused
                 appt_id = appt.get("id")
                 if appt_id:

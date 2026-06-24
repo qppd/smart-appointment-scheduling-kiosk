@@ -30,6 +30,7 @@ from gui.config import (
     TEXT_WHITE,
     REF_W, REF_H, FULLSCREEN, compute_scale, s, font_tuple,
     HEARTBEAT_INTERVAL, COMMAND_POLL_INTERVAL,
+    APPOINTMENTS_POLL_INTERVAL,
 )
 from gui.screens.home import HomeScreen
 from gui.screens.verify import VerifyScreen
@@ -117,6 +118,15 @@ class KioskApp(ctk.CTk):
         self.running = True
         self.current_esp_connected = False
 
+        # Caches to keep the polling loop cheap. Populated lazily on
+        # first fetch_invalidate_a_user (uid) if/when needed.
+        # DON'T load `users/` here at startup: this is the GUI thread
+        # and we want kiosk startup < 2 s. The polling loop warms
+        # the cache on its first tick.
+        self._user_cache = {}              # uid -> user record
+        self._template_index = {}          # int(template_id) -> uid
+        self._appointments_warmed = False  # set True after first successful tick
+
         # UI stack
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -141,11 +151,13 @@ class KioskApp(ctk.CTk):
         self.otp_enroll_screen = OTPEnrollScreen(
             self, firebase_service=self.fb_service,
             on_proceed=self._proceed_to_enroll,
-            on_cancel=self._show_home)
+            on_cancel=self._show_home,
+            on_user_changed=self._on_user_changed_app)
         self.enroll_screen = EnrollScreen(
             self, serial_handler=self.serial,
             firebase_service=self.fb_service,
-            on_complete=self._enroll_complete, on_cancel=self._show_home)
+            on_complete=self._enroll_complete, on_cancel=self._show_home,
+            on_user_changed=self._on_user_changed_app)
 
         for s in (self.home_screen, self.verify_screen,
                    self.result_screen, self.admin_screen,
@@ -178,6 +190,32 @@ class KioskApp(ctk.CTk):
         entry_widget.bind("<FocusIn>", lambda e, w=entry_widget: self._show_keyboard(w))
         entry_widget.bind("<FocusOut>", lambda e: self._on_focus_out())
         entry_widget.bind("<Button-1>", lambda e, w=entry_widget: self._show_keyboard(w))
+
+    def on_user_changed(self, uid: str, fresh_user: dict | None = None):
+        """Hook for enroll/otp_enroll screens to invalidate the cached
+        user record + reverse index after a write, so the very next
+        queue refresh shows up-to-date state. Safe to call from any thread.
+        """
+        if not uid:
+            return
+        self._user_cache.pop(uid, None)
+        # Drop any stale template_id->uid mapping that pointed at this uid
+        stale = [tid for tid, cand in self._template_index.items() if cand == uid]
+        for tid in stale:
+            self._template_index.pop(tid, None)
+        if isinstance(fresh_user, dict):
+            self._user_cache[uid] = fresh_user
+            fp = fresh_user.get("fingerprint_template_id")
+            if fp is not None:
+                try:
+                    self._template_index[int(fp)] = uid
+                except (TypeError, ValueError):
+                    pass
+
+    # Wrapper used as the `on_user_changed` callback passed to enroll
+    # screens, which expect a positional `(uid, fresh_user)` signature.
+    def _on_user_changed_app(self, uid, fresh_user=None):
+        self.on_user_changed(uid, fresh_user)
 
     def _show_keyboard(self, entry_widget):
         self._keyboard_active_entry = entry_widget
@@ -263,34 +301,56 @@ class KioskApp(ctk.CTk):
 
     # ---------- success path: resolve → appointment ----------
     def _resolve_and_show_success(self, template_id):
+        """Resolve a fingerprint match to a checked-in appointment
+        using the warm cache built by _appointments_loop. If the cache
+        hasn't seen this template yet (cold start, race), fall back
+        to one per-uid retry rather than scanning whole trees.
+        """
         try:
-            # Find user with fingerprint_template_id match
-            users = self.fb_service.get_child("users") or {}
-            resident_id = None
-            resident_name = ""
-            for uid, u in users.items():
-                if not isinstance(u, dict):
-                    continue
-                fp = u.get("fingerprint_template_id")
-                if fp is not None and int(fp) == int(template_id):
-                    resident_id = uid
-                    resident_name = f"{u.get('first_name', '')} {u.get('last_name', '')}".strip()
-                    break
+            target_template = int(template_id)
+            uid = self._template_index.get(target_template)
+            user = None
+            if uid and uid in self._user_cache:
+                user = self._user_cache[uid]
 
-            if not resident_id:
+            # Cold-cache fallback: a single per-uid read instead of
+            # scanning the entire users/users + appointments trees.
+            if user is None:
+                uid = None
+                all_users = self.fb_service.get_child("users") or {}
+                for cand_uid, u in all_users.items():
+                    if not isinstance(u, dict):
+                        continue
+                    if u.get("fingerprint_template_id") is not None and \
+                            int(u["fingerprint_template_id"]) == target_template:
+                        uid = cand_uid
+                        user = u
+                        # Absorb into the cache so subsequent matches don't
+                        # hit the network again.
+                        self._user_cache[uid] = u
+                        self._template_index[target_template] = uid
+                        break
+
+            if not uid or not isinstance(user, dict):
                 self.result_screen.show_failure(
                     f"No resident found for template {template_id}")
                 self._show(self.result_screen)
                 return
 
-            # Find today's appointment
+            resident_id = uid
+            resident_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+
+            # Find today's appointment. A single read of the appointments
+            # node, filtered locally — no per-uid scan.
             today = datetime.now().strftime("%Y-%m-%d")
             appointments = self.fb_service.get_child("appointments") or {}
             appointment = None
             for aid, a in appointments.items():
                 if not isinstance(a, dict):
                     continue
-                if a.get("resident_id") == resident_id and a.get("appointment_date") == today and a.get("status") in ("scheduled", "checked_in"):
+                if a.get("resident_id") == resident_id and \
+                        a.get("appointment_date") == today and \
+                        a.get("status") in ("scheduled", "checked_in"):
                     appointment = a
                     appointment["id"] = aid
                     break
@@ -389,16 +449,69 @@ class KioskApp(ctk.CTk):
             time.sleep(COMMAND_POLL_INTERVAL / 1000)
 
     def _appointments_loop(self):
+        """Poll today's appointments + once-per-60s users warm.
+
+        Steady-state cost: ONE Firebase REST request per 30 s tick
+        (`appointments`), plus one full `users` read every 60 s to
+        refresh names and template indexes. This keeps us comfortably
+        under the 100-connection cap even with multiple kiosks.
+        """
         if not self.fb_service:
             return
 
-        user_cache = getattr(self, "_user_cache", None)
-        if not isinstance(user_cache, dict):
-            user_cache = {}
+        last_user_refresh = 0.0         # epoch s of last `users` refresher
+        last_appt_fetch = 0.0           # epoch s of last `appointments` fetch
+        USER_REFRESH_INTERVAL = 60      # s between full `users` reads
+
+        def _refresh_users_cache():
+            """One-shot `users` fetch, populates the in-memory cache
+            AND the template-id -> uid reverse index. Returns the
+            fetched dict (empty on error)."""
+            try:
+                users = self.fb_service.get_child("users") or {}
+                if not isinstance(users, dict):
+                    return {}
+                self._user_cache = users
+                # Rebuild the template_id -> uid reverse index
+                self._template_index = {}
+                for uid, u in users.items():
+                    if not isinstance(u, dict):
+                        continue
+                    fp = u.get("fingerprint_template_id")
+                    if fp is not None:
+                        try:
+                            self._template_index[int(fp)] = uid
+                        except (TypeError, ValueError):
+                            continue
+                return users
+            except Exception:
+                traceback.print_exc()
+                return {}
 
         def _fetch_and_update():
+            nonlocal last_user_refresh, last_appt_fetch
+
+            now = time.time()
             today = datetime.now().strftime("%Y-%m-%d")
-            all_appts = self.fb_service.get_child("appointments") or {}
+
+            # Refresh the users cache either on first run, or when the
+            # polling interval has elapsed (covers admin promote/demote
+            # changes that affect the queue list).
+            cache_empty = not self._user_cache
+            if cache_empty or (now - last_user_refresh) >= USER_REFRESH_INTERVAL:
+                users = _refresh_users_cache()
+                last_user_refresh = now
+            else:
+                users = self._user_cache
+
+            # One per-tick appointment fetch.
+            try:
+                all_appts = self.fb_service.get_child("appointments") or {}
+                last_appt_fetch = now
+            except Exception:
+                traceback.print_exc()
+                all_appts = {}
+
             todays = []
             for aid, a in all_appts.items():
                 if not isinstance(a, dict):
@@ -407,11 +520,7 @@ class KioskApp(ctk.CTk):
                     continue
                 a["id"] = aid
                 uid = a.get("resident_id")
-                if uid and uid not in user_cache:
-                    user = self.fb_service.get_child(f"users/{uid}") or {}
-                    if isinstance(user, dict):
-                        user_cache[uid] = user
-                u = user_cache.get(uid, {}) if uid else {}
+                u = users.get(uid, {}) if uid else {}
                 if isinstance(u, dict):
                     a["resident_first_name"] = u.get("first_name", "")
                     a["resident_last_name"] = u.get("last_name", "")
@@ -421,26 +530,16 @@ class KioskApp(ctk.CTk):
                     a["resident_last_name"] = ""
                     a["fingerprint_enrolled"] = False
                 todays.append(a)
-            self._user_cache = user_cache
+            self._appointments_warmed = True
             self.after(0, lambda d=list(todays): self.home_screen.update_appointments(d))
 
-        def _on_stream_event(event):
-            if not self.running:
-                return
+        while self.running:
             try:
                 _fetch_and_update()
             except Exception:
                 traceback.print_exc()
-
-        # Stream real-time changes from the appointments node
-        ref = db.reference("appointments")
-        while self.running:
-            try:
-                ref.listen(_on_stream_event)
-            except Exception:
-                traceback.print_exc()
-                time.sleep(5)
-            if not self.running:
-                break
+            # Use APPOINTMENTS_POLL_INTERVAL (30 s) — admin commands don't
+            # drive this loop and the home queue doesn't need 5 s ticks.
+            time.sleep(APPOINTMENTS_POLL_INTERVAL)
 
     

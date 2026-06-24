@@ -84,10 +84,11 @@ def s_tap(val: float) -> int:
 
 # ── Auth / Timings (constant across screens) ──
 ADMIN_PIN = "0000"
-HEARTBEAT_INTERVAL = 10000       # 10 seconds
-COMMAND_POLL_INTERVAL = 2000     # 2 seconds
+HEARTBEAT_INTERVAL = 30000       # 30 seconds (was 10s; reduces REST traffic 3x)
+COMMAND_POLL_INTERVAL = 5000     # 5 seconds (was 2s; admin commands tolerate 5s latency)
 VERIFY_TIMEOUT = 30000           # 30 seconds
 RESULT_AUTO_RETURN = 10000       # 10 seconds
+APPOINTMENTS_POLL_INTERVAL = 30  # seconds between full appointment refreshes
 
 
 def to_12_hour(time_str: str) -> str:

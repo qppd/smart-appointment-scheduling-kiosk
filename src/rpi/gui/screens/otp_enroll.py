@@ -20,13 +20,16 @@ class OTPEnrollScreen(ctk.CTkFrame):
     def __init__(self, master, firebase_service,
                  on_proceed: Callable[[dict], Any],
                  on_cancel: Callable[[], Any],
+                 on_user_changed: Callable | None = None,
                  **kwargs):
         super().__init__(master, fg_color=BG, **kwargs)
         self.firebase = firebase_service
         self.on_proceed = on_proceed
         self.on_cancel = on_cancel
+        self.on_user_changed = on_user_changed
         self._otp = ""
         self._matched_appointment: Optional[dict] = None
+        self._matched_uid: Optional[str] = None
         self._running = True
         self._build_ui()
 
@@ -252,6 +255,7 @@ class OTPEnrollScreen(ctk.CTkFrame):
                 return
 
             self._matched_appointment = matched
+            self._matched_uid = matched_uid
             self.after(0, self._show_result)
 
         except Exception as e:
@@ -274,6 +278,16 @@ class OTPEnrollScreen(ctk.CTkFrame):
 
     def _on_proceed(self):
         if self._matched_appointment:
+            # Trigger cache invalidation now so the *next* polling tick
+            # sees fresh state (the actual enrollment write happens
+            # inside `EnrollScreen._do_enroll`; this covers the rare
+            # case where the user cancels the biometric step but
+            # the OTP appointment is still flagged as scheduled).
+            if self.on_user_changed and self._matched_uid:
+                try:
+                    self.on_user_changed(self._matched_uid)
+                except Exception:
+                    pass
             self._result_frame.pack_forget()
             self.on_proceed(self._matched_appointment)
 
