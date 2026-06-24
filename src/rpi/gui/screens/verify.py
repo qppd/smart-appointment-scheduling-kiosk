@@ -26,10 +26,12 @@ class VerifyScreen(ctk.CTkFrame):
         self.on_result = on_result
         self.on_cancel = on_cancel
         self._running = False
+        self._cancelled = False
         self._build_ui()
 
     def show(self):
         self._running = True
+        self._cancelled = False
         self._status_text.configure(text="Place your finger on the scanner")
         self._status_label.configure(text="Waiting...")
         self._cancel_btn.configure(state="normal")
@@ -144,6 +146,10 @@ class VerifyScreen(ctk.CTkFrame):
                 else:
                     time.sleep(0.2)
 
+            # User cancelled; don't trigger the failure/timeout flow
+            if self._cancelled:
+                return
+
             # Timeout
             self.after(0, lambda: self._status_text.configure(
                 text="Timed out"))
@@ -169,6 +175,7 @@ class VerifyScreen(ctk.CTkFrame):
         self.after(50, self._pulse)
 
     def _on_cancel(self):
+        self._cancelled = True
         self._running = False
         self.on_cancel()
 
