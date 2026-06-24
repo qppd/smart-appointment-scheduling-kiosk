@@ -1,16 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signUp } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
+import { signUp, getUserData } from '@/lib/auth';
+import { MobileBackButton } from '@/components/MobileBackButton';
 import { User, Phone, Mail, Calendar, MapPin, Lock, AlertCircle } from 'lucide-react';
 
 export default function Register() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [form, setForm] = useState({ first_name: '', last_name: '', middle_name: '', email: '', phone: '', birth_date: '', address: '', password: '', confirm_password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      getUserData(user.uid).then((data) => {
+        const target = data?.role === 'admin' ? '/dolores-taytay-admin' : '/booking';
+        router.replace(target);
+      });
+    }
+  }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +35,7 @@ export default function Register() {
         first_name: form.first_name, last_name: form.last_name, middle_name: form.middle_name,
         email: form.email, phone: form.phone, birth_date: form.birth_date, address: form.address,
       });
-      router.push('/booking');
+      router.replace('/booking');
     } catch {
       setError('Registration failed. Please try again.');
     } finally {
@@ -31,8 +43,17 @@ export default function Register() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
+      <MobileBackButton />
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Register Your Account</h1>
         {error && (

@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { onAuthChange, getUserData } from '@/lib/auth';
+import { getUserData } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
+import { MobileBackButton } from '@/components/MobileBackButton';
 import { subscribeMyAppointments, cancelAppointment, regenerateEnrollmentOTP } from '@/lib/rtdb';
 import type { Appointment } from '@/types';
 import { to12HourFormat } from '@/lib/utils';
@@ -10,37 +12,31 @@ import { useRouter } from 'next/navigation';
 
 export default function MyAppointments() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authChecking, setAuthChecking] = useState(true);
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [alreadyEnrolled, setAlreadyEnrolled] = useState(false);
 
   useEffect(() => {
-    let unsub: () => void;
-    const authUnsub = onAuthChange((user) => {
-      setAuthChecking(false);
-      if (!user) {
-        router.push('/login');
+    if (!authLoading && !user) {
+      router.replace('/login');
+      return;
+    }
+    if (!user) return;
+    getUserData(user.uid).then((data) => {
+      if (data?.role === 'admin') {
+        router.replace('/dolores-taytay-admin');
         return;
       }
-      getUserData(user.uid).then((data) => {
-        if (data?.role === 'admin') {
-          router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
-          return;
-        }
-        setAlreadyEnrolled(Boolean(data?.fingerprint_enrolled));
-      });
-      unsub = subscribeMyAppointments(user.uid, (apts) => {
-        setAppointments(apts);
-        setLoading(false);
-      });
+      setAlreadyEnrolled(Boolean(data?.fingerprint_enrolled));
     });
-    return () => {
-      authUnsub();
-      if (unsub) unsub();
-    };
-  }, [router]);
+    const unsub = subscribeMyAppointments(user.uid, (apts) => {
+      setAppointments(apts);
+      setLoading(false);
+    });
+    return () => { unsub(); };
+  }, [authLoading, user, router]);
 
   const handleCancel = async (id: string) => {
     if (confirm('Cancel this appointment?')) await cancelAppointment(id);
@@ -63,7 +59,7 @@ export default function MyAppointments() {
     }
   };
 
-  if (authChecking) {
+  if (authLoading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-teal-600 mx-auto" />
@@ -74,6 +70,7 @@ export default function MyAppointments() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      <MobileBackButton />
       <h1 className="text-2xl font-bold text-gray-900 mb-6">My Appointments</h1>
       {loading && <p className="text-gray-500 text-center py-8">Loading...</p>}
       {!loading && appointments.length === 0 && (

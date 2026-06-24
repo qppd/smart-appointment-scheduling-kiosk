@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ref, get, child } from 'firebase/database';
-import { onAuthChange, getUserData } from '@/lib/auth';
+import { getUserData } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
+import { MobileBackButton } from '@/components/MobileBackButton';
 import { subscribeServices, createAppointment, regenerateEnrollmentOTP } from '@/lib/rtdb';
 import { db } from '@/lib/firebase';
 import type { Service } from '@/types';
@@ -23,30 +25,31 @@ export default function Booking() {
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [authChecking, setAuthChecking] = useState(true);
+  const { user, loading: authLoading } = useAuth();
   const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
   const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthChange((u) => {
-      setAuthChecking(false);
-      if (!u) { router.push('/login'); return; }
-      setUser(u);
-      getUserData(u.uid).then((data) => {
-        if (data?.role === 'admin') {
-          router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
-        }
-      });
-    });
-    return () => unsub();
-  }, [router]);
+    if (!authLoading && !user) {
+      router.replace('/login');
+    }
+  }, [authLoading, user, router]);
 
   useEffect(() => {
-    if (authChecking) return;
+    if (!authLoading && user) {
+      getUserData(user.uid).then((data) => {
+        if (data?.role === 'admin') {
+          router.replace('/dolores-taytay-admin');
+        }
+      });
+    }
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (authLoading) return;
     const unsub = subscribeServices((s) => setServices(s));
     return () => unsub();
-  }, [authChecking]);
+  }, [authLoading]);
 
   const slots = selectedService ? generateSlots(selectedService.duration_minutes) : [];
   const availableSlots = slots.filter(s => !bookedSlots.has(s));
@@ -119,7 +122,7 @@ export default function Booking() {
     } finally { setRegenerating(false); }
   };
 
-  if (authChecking) {
+  if (authLoading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-teal-600 mx-auto" />
@@ -128,7 +131,13 @@ export default function Booking() {
     );
   }
 
-  if (!user) { return null; }
+  if (!user) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+        <p className="text-gray-500">Redirecting...</p>
+      </div>
+    );
+  }
 
   if (step === 'done') {
     return (
@@ -158,6 +167,7 @@ export default function Booking() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
+      <MobileBackButton />
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Book Appointment</h1>
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center gap-2"><AlertCircle className="h-5 w-5"/>{error}</div>}
 

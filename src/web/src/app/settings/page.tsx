@@ -3,7 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { onAuthChange, getUserData } from '@/lib/auth';
+import { getUserData } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
+import { MobileBackButton } from '@/components/MobileBackButton';
 import { subscribeKioskStatus, subscribeKioskCommands, sendKioskCommand } from '@/lib/rtdb';
 import type { KioskStatus, KioskCommand } from '@/types';
 import {
@@ -359,31 +361,27 @@ function AppPreferences() {
 /* ------------------------------------------------------------------ */
 export default function Settings() {
   const router = useRouter();
-  const [authUser, setAuthUser] = useState<any>(null);
+  const { user, loading: authLoading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState('kiosk');
 
   useEffect(() => {
-    const unsub = onAuthChange((u) => {
-      if (!u) {
-        router.push('/login');
-        return;
-      }
-      setAuthUser(u);
-      getUserData(u.uid).then((data) => {
-        const admin = data?.role === 'admin' || u.email === ADMIN_EMAIL;
-        setIsAdmin(admin);
-        setChecking(false);
-        if (!admin && activeTab === 'kiosk') {
-          setActiveTab('notifications');
-        }
-      });
-    });
-    return () => unsub();
-  }, [router, activeTab]);
+    if (!authLoading && !user) {
+      router.replace('/login');
+      return;
+    }
+    if (!user) return;
 
-  if (checking) {
+    getUserData(user.uid).then((data) => {
+      const admin = data?.role === 'admin' || user.email === ADMIN_EMAIL;
+      setIsAdmin(admin);
+      if (!admin && activeTab === 'kiosk') {
+        setActiveTab('notifications');
+      }
+    });
+  }, [authLoading, user, router, activeTab]);
+
+  if (authLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
@@ -404,11 +402,14 @@ export default function Settings() {
       {/* Top Nav */}
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-teal-600">
-              <ArrowLeft className="h-5 w-5" />
-              <span className="text-sm font-medium">Back to Home</span>
-            </Link>
+          <div className="flex justify-between h-16 items-center items-center">
+            <div className="flex items-center gap-2">
+              <MobileBackButton />
+              <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-teal-600">
+                <ArrowLeft className="h-5 w-5" />
+                <span className="text-sm font-medium">Back to Home</span>
+              </Link>
+            </div>
             <span className="text-xl font-bold text-teal-700 flex items-center gap-2">
               <SettingsIcon className="h-5 w-5" /> Settings
             </span>

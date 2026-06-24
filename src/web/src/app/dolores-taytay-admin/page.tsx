@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthChange, getUserData, signOut } from '@/lib/auth';
+import { getUserData, signOut } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
 import {
   subscribeAllServices,
   subscribeAllAppointments,
@@ -407,8 +408,6 @@ export default function AdminDashboard() {
   const [authUser, setAuthUser] = useState<any>(null);
   const [userName, setUserName] = useState('Admin');
   const [userEmail, setUserEmail] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [checking, setChecking] = useState(true);
 
   /* data */
   const [services, setServices] = useState<Service[]>([]);
@@ -421,24 +420,23 @@ export default function AdminDashboard() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingService, setDeletingService] = useState<Service | null>(null);
 
+  /* refs for subscription cleanup */
+  const unsubServices = useRef<(() => void) | null>(null);
+  const unsubAppointments = useRef<(() => void) | null>(null);
+  const unsubUsers = useRef<(() => void) | null>(null);
+
   /* auth check */
+  const { user, loading: authLoading, isAdmin } = useAuth();
+
   useEffect(() => {
-    let unsubServices: (() => void) | null = null;
-    let unsubAppointments: (() => void) | null = null;
-    let unsubUsers: (() => void) | null = null;
-
-    const authUnsub = onAuthChange((u) => {
-      if (!u) {
-        router.push('/login');
-        return;
-      }
-      setAuthUser(u);
-      setUserEmail(u.email || '');
-
-      getUserData(u.uid).then((userData) => {
-        const isUserAdmin = userData?.role === 'admin' || u.email === ADMIN_EMAIL;
-        setIsAdmin(isUserAdmin);
-        setChecking(false);
+    if (!authLoading && !user) {
+      router.replace('/login');
+      return;
+    }
+    if (!authLoading && user) {
+      setUserEmail(user.email || '');
+      getUserData(user.uid).then((userData) => {
+        const isUserAdmin = userData?.role === 'admin' || user.email === ADMIN_EMAIL;
 
         if (userData) {
           setUserName(`${userData.first_name || ''} ${userData.last_name || ''}`.trim() || 'Admin');
@@ -446,22 +444,15 @@ export default function AdminDashboard() {
 
         if (isUserAdmin) {
           const us = subscribeAllServices((s) => setServices(s));
-          unsubServices = us;
+          unsubServices.current = us;
           const ua = subscribeAllAppointments((a) => setAppointments(a));
-          unsubAppointments = ua;
+          unsubAppointments.current = ua;
           const uu = subscribeUsers((uu) => setUsers(uu));
-          unsubUsers = uu;
+          unsubUsers.current = uu;
         }
       });
-    });
-
-    return () => {
-      authUnsub();
-      if (unsubServices) unsubServices();
-      if (unsubAppointments) unsubAppointments();
-      if (unsubUsers) unsubUsers();
-    };
-  }, [router]);
+    }
+  }, [authLoading, user, router]);
 
   /* table states */
   const servicesTable = useTableState(services);
@@ -531,7 +522,7 @@ export default function AdminDashboard() {
   const activeServicesCount = services.filter((s) => s.is_active).length;
 
   /* guards */
-  if (checking) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

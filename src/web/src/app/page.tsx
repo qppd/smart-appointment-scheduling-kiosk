@@ -1,11 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { onAuthChange, getUserData, signOut } from '@/lib/auth';
-import type { User as FirebaseUser } from 'firebase/auth';
-import { Calendar, Fingerprint, Bell, ClipboardList, UserCircle, ChevronDown, LogOut } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '@/lib/AuthContext';
+import { signOut as doSignOut } from '@/lib/auth';
+import {
+  Calendar,
+  Fingerprint,
+  Bell,
+  ClipboardList,
+  UserCircle,
+  ChevronDown,
+  LogOut,
+} from 'lucide-react';
 
 function useClickOutside(ref: React.RefObject<HTMLElement>, handler: () => void) {
   useEffect(() => {
@@ -27,24 +34,10 @@ const features = [
 ];
 
 export default function Home() {
-  const router = useRouter();
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const { user, isAdmin } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   useClickOutside(dropdownRef, () => setDropdownOpen(false));
-
-  useEffect(() => {
-    return onAuthChange((u) => {
-      setUser(u);
-      if (u) {
-        getUserData(u.uid).then((data) => {
-          if (data?.role === 'admin') {
-            router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
-          }
-        });
-      }
-    });
-  }, [router]);
 
   return (
     <div>
@@ -81,7 +74,7 @@ export default function Home() {
                         </Link>
                         <hr className="my-1 border-gray-100" />
                         <button
-                          onClick={() => { setDropdownOpen(false); signOut(); }}
+                          onClick={() => { setDropdownOpen(false); doSignOut(); }}
                           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
                         >
                           <LogOut className="h-4 w-4" /> Logout
@@ -108,8 +101,14 @@ export default function Home() {
             Skip the long queues. Book your barangay appointments online and check in securely using our fingerprint kiosk.
           </p>
           <div className="flex justify-center gap-4">
-            <Link href="/register" className="bg-white text-teal-700 px-8 py-3 rounded-lg font-semibold hover:bg-teal-50">Get Started</Link>
-            <Link href="/login" className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10">Sign In</Link>
+            {user ? (
+              <Link href="/booking" className="bg-white text-teal-700 px-8 py-3 rounded-lg font-semibold hover:bg-teal-50">Go to Booking</Link>
+            ) : (
+              <>
+                <Link href="/register" className="bg-white text-teal-700 px-8 py-3 rounded-lg font-semibold hover:bg-teal-50">Get Started</Link>
+                <Link href="/login" className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/10">Sign In</Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -132,7 +131,7 @@ export default function Home() {
 
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Features</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-12">Features</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((f) => {
               const Icon = f.icon;

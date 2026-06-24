@@ -1,40 +1,55 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signIn, getUserData } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
+import { getUserData } from '@/lib/auth';
+import { MobileBackButton } from '@/components/MobileBackButton';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const router = useRouter();
+  const { user, loading, signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!loading && user) {
+      getUserData(user.uid).then((data) => {
+        const target = data?.role === 'admin' ? '/dolores-taytay-admin' : '/booking';
+        router.replace(target);
+      });
+    }
+  }, [user, loading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     setError('');
     try {
-      const result = await signIn(email, password);
-      const userData = await getUserData(result.user.uid);
-      if (userData?.role === 'admin') {
-        router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
-      } else {
-        router.push('/booking');
-      }
+      await signIn(email, password);
     } catch {
       setError('Invalid email or password');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 text-center">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+    <div className="max-w-md mx-auto px-4 py-8">
+      <MobileBackButton />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mt-4">
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Sign In</h1>
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start gap-2">
@@ -57,8 +72,8 @@ export default function Login() {
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg" required />
             </div>
           </div>
-          <button type="submit" disabled={loading} className="w-full bg-teal-600 text-white py-3 rounded-lg font-semibold hover:bg-teal-700 disabled:opacity-50">
-            {loading ? 'Signing in...' : 'Sign In'}
+          <button type="submit" disabled={submitting || loading} className="w-full bg-teal-600 text-white py-3 rounded-lg font-semibold hover:bg-teal-700 disabled:opacity-50">
+            {submitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
         <p className="text-center text-sm text-gray-500 mt-6">

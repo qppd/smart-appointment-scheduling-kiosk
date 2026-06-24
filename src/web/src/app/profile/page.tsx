@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { onAuthChange, getUserData } from '@/lib/auth';
+import { getUserData } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
+import { MobileBackButton } from '@/components/MobileBackButton';
 import { subscribeMyAppointments, updateUser } from '@/lib/rtdb';
 import type { User as UserType, Appointment } from '@/types';
 import {
@@ -15,7 +17,7 @@ import { to12HourFormat } from '@/lib/utils';
 
 export default function Profile() {
   const router = useRouter();
-  const [authUser, setAuthUser] = useState<any>(null);
+  const { user, loading: authLoading } = useAuth();
   const [userData, setUserData] = useState<UserType | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,42 +36,39 @@ export default function Profile() {
   });
 
   useEffect(() => {
-    const unsub = onAuthChange((u) => {
-      if (!u) {
-        router.push('/login');
+    if (!authLoading && !user) {
+      router.replace('/login');
+      return;
+    }
+    if (!user) return;
+
+    getUserData(user.uid).then((data) => {
+      if (data?.role === 'admin') {
+        router.replace('/dolores-taytay-admin');
         return;
       }
-      setAuthUser(u);
-
-      getUserData(u.uid).then((data) => {
-        if (data?.role === 'admin') {
-          router.push('https://smart-appointment-scheduling-kiosk.vercel.app/dolores-taytay-admin');
-          return;
-        }
-        if (data) {
-          setUserData(data as UserType);
-          setForm({
-            first_name: data.first_name || '',
-            last_name: data.last_name || '',
-            middle_name: data.middle_name || '',
-            phone: data.phone || '',
-            address: data.address || '',
-            birth_date: data.birth_date || '',
-          });
-        }
-        setLoading(false);
-      });
+      if (data) {
+        setUserData(data as UserType);
+        setForm({
+          first_name: data.first_name || '',
+          last_name: data.last_name || '',
+          middle_name: data.middle_name || '',
+          phone: data.phone || '',
+          address: data.address || '',
+          birth_date: data.birth_date || '',
+        });
+      }
+      setLoading(false);
     });
-    return () => unsub();
-  }, [router]);
+  }, [authLoading, user, router]);
 
   useEffect(() => {
-    if (!authUser) return;
-    const unsub = subscribeMyAppointments(authUser.uid, (appts) => {
+    if (!user) return;
+    const unsub = subscribeMyAppointments(user.uid, (appts) => {
       setAppointments(appts);
     });
     return () => unsub();
-  }, [authUser]);
+  }, [user]);
 
   useEffect(() => {
     if (!success) return;
@@ -78,11 +77,11 @@ export default function Profile() {
   }, [success]);
 
   const handleSave = async () => {
-    if (!authUser) return;
+    if (!user) return;
     setSaving(true);
     setError('');
     try {
-      await updateUser(authUser.uid, form);
+      await updateUser(user.uid, form);
       setUserData((prev) => (prev ? { ...prev, ...form } as UserType : null));
       setSuccess('Profile updated successfully.');
       setEditMode(false);
@@ -119,10 +118,13 @@ export default function Profile() {
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-teal-600">
-              <ArrowLeft className="h-5 w-5" />
-              <span className="text-sm font-medium">Back to Home</span>
-            </Link>
+            <div className="flex items-center gap-2">
+              <MobileBackButton />
+              <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-teal-600">
+                <ArrowLeft className="h-5 w-5" />
+                <span className="text-sm font-medium">Back to Home</span>
+              </Link>
+            </div>
             <span className="text-xl font-bold text-teal-700">My Profile</span>
             <div className="w-20" />
           </div>
