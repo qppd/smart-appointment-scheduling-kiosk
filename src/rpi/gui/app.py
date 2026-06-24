@@ -391,40 +391,56 @@ class KioskApp(ctk.CTk):
     def _appointments_loop(self):
         if not self.fb_service:
             return
-        # Resident name cache so we don't refetch the same user on every loop
+
         user_cache = getattr(self, "_user_cache", None)
         if not isinstance(user_cache, dict):
             user_cache = {}
-        while self.running:
+
+        def _fetch_and_update():
+            today = datetime.now().strftime("%Y-%m-%d")
+            all_appts = self.fb_service.get_child("appointments") or {}
+            todays = []
+            for aid, a in all_appts.items():
+                if not isinstance(a, dict):
+                    continue
+                if a.get("appointment_date") != today:
+                    continue
+                a["id"] = aid
+                uid = a.get("resident_id")
+                if uid and uid not in user_cache:
+                    user = self.fb_service.get_child(f"users/{uid}") or {}
+                    if isinstance(user, dict):
+                        user_cache[uid] = user
+                u = user_cache.get(uid, {}) if uid else {}
+                if isinstance(u, dict):
+                    a["resident_first_name"] = u.get("first_name", "")
+                    a["resident_last_name"] = u.get("last_name", "")
+                    a["fingerprint_enrolled"] = u.get("fingerprint_enrolled", False)
+                else:
+                    a["resident_first_name"] = ""
+                    a["resident_last_name"] = ""
+                    a["fingerprint_enrolled"] = False
+                todays.append(a)
+            self._user_cache = user_cache
+            self.after(0, lambda d=list(todays): self.home_screen.update_appointments(d))
+
+        def _on_stream_event(event):
+            if not self.running:
+                return
             try:
-                today = datetime.now().strftime("%Y-%m-%d")
-                all_appts = self.fb_service.get_child("appointments") or {}
-                todays = []
-                for aid, a in all_appts.items():
-                    if not isinstance(a, dict):
-                        continue
-                    if a.get("appointment_date") != today:
-                        continue
-                    a["id"] = aid
-                    uid = a.get("resident_id")
-                    if uid and uid not in user_cache:
-                        user = self.fb_service.get_child(f"users/{uid}") or {}
-                        if isinstance(user, dict):
-                            user_cache[uid] = user
-                    u = user_cache.get(uid, {}) if uid else {}
-                    if isinstance(u, dict):
-                        a["resident_first_name"] = u.get("first_name", "")
-                        a["resident_last_name"] = u.get("last_name", "")
-                        a["fingerprint_enrolled"] = u.get("fingerprint_enrolled", False)
-                    else:
-                        a["resident_first_name"] = ""
-                        a["resident_last_name"] = ""
-                        a["fingerprint_enrolled"] = False
-                    todays.append(a)
-                self._user_cache = user_cache
-                self.after(0, lambda d=list(todays): self.home_screen.update_appointments(d))
+                _fetch_and_update()
             except Exception:
                 traceback.print_exc()
-            time.sleep(5)
+
+        # Stream real-time changes from the appointments node
+        ref = db.reference("appointments")
+        while self.running:
+            try:
+                ref.listen(_on_stream_event)
+            except Exception:
+                traceback.print_exc()
+                time.sleep(5)
+            if not self.running:
+                break
 
     
