@@ -1,5 +1,6 @@
 import {
   ref, onValue, push, set, update, get, query, orderByChild, equalTo,
+  runTransaction,
 } from 'firebase/database';
 import { db } from './firebase';
 import type { Service, Appointment, User, KioskStatus, KioskCommand } from '@/types';
@@ -33,6 +34,20 @@ export function subscribeMyAppointments(residentId: string, callback: (appointme
   });
 }
 
+function sanitizeKey(key: string): string {
+  // Firebase disallows . $ # [ ] / in path keys
+  return key.replace(/[.#$\[\]\/]/g, '_');
+}
+
+function createSlotKey(
+  serviceId: string,
+  date: string,
+  startTime: string,
+  endTime: string
+): string {
+  return sanitizeKey(`${serviceId}_${date}_${startTime}_${endTime}`);
+}
+
 export function generateEnrollmentOTP(): { otp: string; expires_at: string } {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h expiry
@@ -40,21 +55,85 @@ export function generateEnrollmentOTP(): { otp: string; expires_at: string } {
 }
 
 export async function createAppointment(
-  data: Omit<Appointment, 'id' | 'created_at' | 'enrollment_otp' | 'enrollment_otp_expires_at' | 'enrollment_otp_consumed_at'>
+  data: Omit<Appointment, 'id' | 'created_at' | 'enrollment_otp' | 'enrollment_otp_expires_at' | 'enrollment_otp_consumed_at'>,
+  dailyCapacity: number
 ): Promise<{ id: string; otp: string }> {
+  const slotKey = createSlotKey(data.service_id, data.appointment_date, data.start_time!, data.end_time!);
+  const slotRef = ref(db, `slot_bookings/${slotKey}`);
+
+  // Generate a unique claim token so we can verify we won the race.
+  const claimToken = `claim_${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
+
+  // 1. Atomically claim the slot.
+  //    runTransaction retries until Firebase can serialize the write.
+  //    If the slot is already taken, we leave it as-is.
+  await runTransaction(slotRef, (currentData) => {
+    if (currentData !== null) {
+      return currentData; // Slot already claimed, keep it as-is
+    }
+    return claimToken;
+  });
+
+  // Verify we actually own this slot claim.
+  const claimSnap = await get(slotRef);
+  if (claimSnap.val() !== claimToken) {
+    throw new Error('Slot already taken by another user');
+  }
+
+  // 2. Check daily capacity (safe now because the slot is locked).
+  const allSnap = await get(ref(db, 'appointments'));
+  const allApps = allSnap.val() || {};
+  const sameDayActive = Object.values(allApps).filter(
+    (a: any) =>
+      a.appointment_date === data.appointment_date &&
+      a.service_id === data.service_id &&
+      a.status !== 'cancelled'
+  );
+
+  if (sameDayActive.length >= dailyCapacity) {
+    // Release our slot claim and abort.
+    await set(slotRef, null);
+    throw new Error('Daily capacity reached for this service');
+  }
+
+  // 3. Create the actual appointment.
   const { otp, expires_at } = generateEnrollmentOTP();
   const newRef = push(ref(db, 'appointments'));
+
   await set(newRef, {
     ...data,
+    queue_number: sameDayActive.length + 1,
     enrollment_otp: otp,
     enrollment_otp_expires_at: expires_at,
     created_at: new Date().toISOString(),
   });
+
+  // Update slot booking to reference the created appointment.
+  await set(slotRef, newRef.key!);
+
   return { id: newRef.key!, otp };
 }
 
 export async function cancelAppointment(appointmentId: string) {
+  // Read the appointment to find its slot.
+  const snap = await get(ref(db, `appointments/${appointmentId}`));
+  if (!snap.exists()) {
+    throw new Error('Appointment not found');
+  }
+
+  const apt = snap.val();
   await update(ref(db, `appointments/${appointmentId}`), { status: 'cancelled' });
+
+  // Release the slot booking if applicable.
+  if (apt?.service_id && apt?.appointment_date && apt?.start_time && apt?.end_time) {
+    const slotKey = createSlotKey(
+      apt.service_id,
+      apt.appointment_date,
+      apt.start_time,
+      apt.end_time
+    );
+    await set(ref(db, `slot_bookings/${slotKey}`), null);
+  }
 }
 
 export async function regenerateEnrollmentOTP(

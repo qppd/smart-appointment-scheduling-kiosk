@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ref, get, child } from 'firebase/database';
+import { ref, get } from 'firebase/database';
 import { getUserData } from '@/lib/auth';
 import { useAuth } from '@/lib/AuthContext';
 import { MobileBackButton } from '@/components/MobileBackButton';
@@ -78,35 +78,27 @@ export default function Booking() {
     if (!selectedService || !selectedDate || !selectedSlot || !user) return;
     setLoading(true); setError('');
     try {
-      const snap = await get(ref(db, 'appointments'));
-      const data = snap.val() || {};
-      const existing = Object.entries(data).filter(([, a]: [string, any]) => a.appointment_date === selectedDate && a.service_id === selectedService.id && a.status !== 'cancelled');
-      if (existing.length >= selectedService.slot_capacity_per_day) { setError('No slots available for this date.'); setLoading(false); return; }
-      const slotTaken = existing.some(([, a]: [string, any]) => `${a.start_time} - ${a.end_time}` === selectedSlot);
-      if (slotTaken) { setError('This time slot was just booked by another user. Please select a different time.'); setLoading(false); return; }
       const [start, end] = selectedSlot.split(' - ');
       const result = await createAppointment({
         resident_id: user.uid, service_id: selectedService.id, service_name: selectedService.name,
         appointment_date: selectedDate, start_time: start, end_time: end,
-        status: 'scheduled', queue_number: existing.length + 1, verified_by_fingerprint: false,
-      });
+        status: 'scheduled', verified_by_fingerprint: false, queue_number: 0,
+      }, selectedService.slot_capacity_per_day);
 
-      let id = result?.id || '';
-      let otp = result?.otp || '';
-
-      if ((!otp || !id) && id) {
-        try {
-          const remote = await get(child(ref(db, 'appointments'), id));
-          const v = remote.val();
-          if (v) { otp = otp || v.enrollment_otp || ''; setOtpExpiresAt(v.otp_expires_at || null); }
-        } catch {}
-      }
-
-      setAppointmentId(id || '');
-      setEnrollmentOtp(otp || '');
+      setAppointmentId(result.id);
+      setEnrollmentOtp(result.otp);
       setStep('done');
-    } catch (err) { console.error('Booking error:', err); setError('Failed to book. Try again.'); }
-    finally { setLoading(false); }
+    } catch (err: any) {
+      console.error('Booking error:', err);
+      const msg = err?.message || '';
+      if (msg.includes('taken')) {
+        setError('This time slot was just booked by another user. Please select a different time.');
+      } else if (msg.includes('capacity')) {
+        setError('No slots available for this date.');
+      } else {
+        setError('Failed to book. Try again.');
+      }
+    } finally { setLoading(false); }
   };
 
   const regenerateCode = async () => {
