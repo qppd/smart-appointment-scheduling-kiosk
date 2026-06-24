@@ -28,7 +28,7 @@ export function subscribeMyAppointments(residentId: string, callback: (appointme
     const data = snapshot.val();
     if (!data) { callback([]); return; }
     callback(Object.entries(data)
-      .filter(([, a]: [string, any]) => a.resident_id === residentId)
+      .filter(([id, a]: [string, any]) => id !== 'slot_bookings' && a.resident_id === residentId)
       .sort(([, a]: [string, any], [, b]: [string, any]) => b.created_at?.localeCompare(a.created_at))
       .map(([id, a]: [string, any]) => ({ id, ...a }) as Appointment));
   });
@@ -59,7 +59,7 @@ export async function createAppointment(
   dailyCapacity: number
 ): Promise<{ id: string; otp: string }> {
   const slotKey = createSlotKey(data.service_id, data.appointment_date, data.start_time!, data.end_time!);
-  const slotRef = ref(db, `slot_bookings/${slotKey}`);
+  const slotRef = ref(db, `appointments/slot_bookings/${slotKey}`);
 
   // Generate a unique claim token so we can verify we won the race.
   const claimToken = `claim_${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
@@ -132,7 +132,7 @@ export async function cancelAppointment(appointmentId: string) {
       apt.start_time,
       apt.end_time
     );
-    await set(ref(db, `slot_bookings/${slotKey}`), null);
+    await set(ref(db, `appointments/slot_bookings/${slotKey}`), null);
   }
 }
 
@@ -165,7 +165,9 @@ export function subscribeTodayAppointments(callback: (appointments: Appointment[
   return onValue(query(ref(db, 'appointments'), orderByChild('appointment_date'), equalTo(today)), (snapshot) => {
     const data = snapshot.val();
     if (!data) { callback([]); return; }
-    callback(Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a }) as Appointment));
+    callback(Object.entries(data)
+      .filter(([id]) => id !== 'slot_bookings')
+      .map(([id, a]: [string, any]) => ({ id, ...a }) as Appointment));
   });
 }
 
@@ -181,7 +183,9 @@ export function subscribeAllAppointments(callback: (appointments: Appointment[])
   return onValue(ref(db, 'appointments'), (snapshot) => {
     const data = snapshot.val();
     if (!data) { callback([]); return; }
-    callback(Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a }) as Appointment));
+    callback(Object.entries(data)
+      .filter(([id]) => id !== 'slot_bookings')
+      .map(([id, a]: [string, any]) => ({ id, ...a }) as Appointment));
   });
 }
 
