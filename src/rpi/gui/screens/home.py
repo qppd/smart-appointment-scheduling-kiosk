@@ -198,8 +198,10 @@ class HomeScreen(ctk.CTkFrame):
             scrollbar_button_hover_color=PRIMARY_DARK)
         self._queue_container.grid(row=2, column=0, sticky="nsew")
 
-        ctk.CTkLabel(self._queue_container, text="No appointments today",
-                     font=font_tuple("body"), text_color=TEXT_MUTED).pack(pady=s(20))
+        self._empty_label = ctk.CTkLabel(
+            self._queue_container, text="No appointments today",
+            font=font_tuple("body"), text_color=TEXT_MUTED)
+        self._empty_label.pack(pady=s(20))
 
         # ── Status bar ──
         status = ctk.CTkFrame(self, fg_color=BG_SECONDARY,
@@ -304,8 +306,8 @@ class HomeScreen(ctk.CTkFrame):
             text=f"— {len(self.appointments)} total")
 
     def _refresh_queue(self):
-        # Build map of queue_number -> appointment
-        new_appointments = {a.get("queue_number"): a for a in self.appointments}
+        # Build map of queue_number -> appointment (default to 999 if missing)
+        new_appointments = {a.get("queue_number") or 999: a for a in self.appointments}
         existing_numbers = set(self._queue_cards.keys())
         new_numbers = set(new_appointments.keys())
 
@@ -322,15 +324,17 @@ class HomeScreen(ctk.CTkFrame):
             else:
                 self._queue_cards[qn] = self._create_queue_card(a)
 
-        # If no appointments, show empty state
-        if not self.appointments and not hasattr(self, "_empty_label"):
-            self._empty_label = ctk.CTkLabel(
-                self._queue_container, text="No appointments today",
-                font=font_tuple("body"), text_color=TEXT_MUTED)
+        # Show/hide empty state label
+        if self.appointments:
+            if self._empty_label and self._empty_label.winfo_exists():
+                self._empty_label.destroy()
+                self._empty_label = None
+        else:
+            if not self._empty_label or not self._empty_label.winfo_exists():
+                self._empty_label = ctk.CTkLabel(
+                    self._queue_container, text="No appointments today",
+                    font=font_tuple("body"), text_color=TEXT_MUTED)
             self._empty_label.pack(pady=s(20))
-        elif self.appointments and hasattr(self, "_empty_label"):
-            self._empty_label.destroy()
-            del self._empty_label
 
     def _create_queue_card(self, a: dict):
         """Create a new queue card and return it."""
