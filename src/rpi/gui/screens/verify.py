@@ -27,6 +27,7 @@ class VerifyScreen(ctk.CTkFrame):
         self.on_cancel = on_cancel
         self._running = False
         self._cancelled = False
+        self._scan_thread: threading.Thread | None = None
         self._build_ui()
 
     def show(self):
@@ -37,10 +38,14 @@ class VerifyScreen(ctk.CTkFrame):
         self._cancel_btn.configure(state="normal")
         self._progress.set(0)
         self._pulse()
+        # Prevent multiple overlapping scan threads if user taps repeatedly
+        if self._scan_thread is not None and self._scan_thread.is_alive():
+            return
         self._start_scan_thread()
 
     def hide(self):
         self._running = False
+        self._scan_thread = None
 
     def rescale(self):
         """Re-apply scale to canvas size and redraw animation."""
@@ -108,57 +113,67 @@ class VerifyScreen(ctk.CTkFrame):
 
     def _start_scan_thread(self):
         def scan():
-            timeout_at = time.time() + (VERIFY_TIMEOUT / 1000)
-            start = time.time()
+            try:
+                timeout_at = time.time() + (VERIFY_TIMEOUT / 1000)
+                start = time.time()
 
-            while self._running and time.time() < timeout_at:
-                elapsed = time.time() - start
-                pct = min(elapsed / (VERIFY_TIMEOUT / 1000), 0.95)
-                self.after(0, lambda v=pct: self._progress.set(v))
+                while self._running and time.time() < timeout_at:
+                    elapsed = time.time() - start
+                    pct = min(elapsed / (VERIFY_TIMEOUT / 1000), 0.95)
+                    self.after(0, lambda v=pct: self._progress.set(v))
 
-                try:
-                    matched, template_id = self.serial_handler.verify_fingerprint()
-                except Exception as e:
-                    self.after(0, lambda: self._status_text.configure(
-                        text=f"Error: {e}"))
-                    self.after(0, lambda: self._status_label.configure(
-                        text="Try again"))
-                    time.sleep(2)
-                    continue
+                    try:
+                        matched, template_id = self.serial_handler.verify_fingerprint()
+                    except Exception as e:
+                        self.after(0, lambda: self._status_text.configure(
+                            text=f"Error: {e}"))
+                        self.after(0, lambda: self._status_label.configure(
+                            text="Try again"))
+                        time.sleep(2)
+                        continue
 
-                if matched:
-                    self.after(0, lambda: self._progress.set(1.0))
-                    self.after(0, lambda: self._status_text.configure(
-                        text="Fingerprint Matched!"))
-                    self.after(0, lambda: self._status_label.configure(
-                        text=f"Template ID: {template_id}"))
-                    time.sleep(0.5)
-                    self.after(0, lambda: self.on_result(True, template_id))
+                    if matched:
+                        if self._cancelled:
+                            return
+                        self.after(0, lambda: self._progress.set(1.0))
+                        self.after(0, lambda: self._status_text.configure(
+                            text="Fingerprint Matched!"))
+                        self.after(0, lambda: self._status_label.configure(
+                            text=f"Template ID: {template_id}"))
+                        time.sleep(0.5)
+                        if not self._cancelled:
+                            self.after(0, lambda: self.on_result(True, template_id))
+                        return
+                    elif "No match" in str(matched) or "NO_MATCH" in str(matched):
+                        if self._cancelled:
+                            return
+                        self.after(0, lambda: self._status_text.configure(
+                            text="Fingerprint not recognized"))
+                        self.after(0, lambda: self._status_label.configure(
+                            text="Try again"))
+                        time.sleep(1)
+                        if not self._cancelled:
+                            self.after(0, lambda: self.on_result(False, None))
+                        return
+                    else:
+                        time.sleep(0.2)
+
+                if self._cancelled:
                     return
-                elif "No match" in str(matched) or "NO_MATCH" in str(matched):
-                    self.after(0, lambda: self._status_text.configure(
-                        text="Fingerprint not recognized"))
-                    self.after(0, lambda: self._status_label.configure(
-                        text="Try again"))
-                    time.sleep(1)
-                    self.after(0, lambda: self.on_result(False, None))
-                    return
-                else:
-                    time.sleep(0.2)
 
-            # User cancelled; don't trigger the failure/timeout flow
-            if self._cancelled:
-                return
+                # Timeout
+                self.after(0, lambda: self._status_text.configure(
+                    text="Timed out"))
+                self.after(0, lambda: self._status_label.configure(
+                    text="Please try again"))
+                time.sleep(1)
+                if not self._cancelled:
+                    self.after(0, lambda: self.on_result(False, None, timeout=True))
+            finally:
+                self._scan_thread = None
 
-            # Timeout
-            self.after(0, lambda: self._status_text.configure(
-                text="Timed out"))
-            self.after(0, lambda: self._status_label.configure(
-                text="Please try again"))
-            time.sleep(1)
-            self.after(0, lambda: self.on_result(False, None, timeout=True))
-
-        threading.Thread(target=scan, daemon=True).start()
+        self._scan_thread = threading.Thread(target=scan, daemon=True)
+        self._scan_thread.start()
 
     def _pulse(self):
         if not self._running:

@@ -34,5 +34,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Firebase/Google service account keys
+firebase-adminsdk-*.json
+
 # SQLite test db artifacts
 file\:\:memory\:
