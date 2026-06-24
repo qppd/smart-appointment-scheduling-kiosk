@@ -27,6 +27,7 @@ class HomeScreen(ctk.CTkFrame):
         self.esp_connected = False
         self.firebase_connected = False
         self._long_press_id = None
+        self._queue_cards = {}  # queue_number -> card widget
         self._build_ui()
 
     # ── Public API ───────────────────────────────────────────────
@@ -303,19 +304,36 @@ class HomeScreen(ctk.CTkFrame):
             text=f"— {len(self.appointments)} total")
 
     def _refresh_queue(self):
-        for w in self._queue_container.winfo_children():
-            w.destroy()
+        # Build map of queue_number -> appointment
+        new_appointments = {a.get("queue_number"): a for a in self.appointments}
+        existing_numbers = set(self._queue_cards.keys())
+        new_numbers = set(new_appointments.keys())
 
-        if not self.appointments:
-            ctk.CTkLabel(self._queue_container, text="No appointments today",
-                         font=font_tuple("body"), text_color=TEXT_MUTED).pack(pady=s(20))
-            return
+        # Remove cards that are no longer in appointments
+        for qn in existing_numbers - new_numbers:
+            card = self._queue_cards.pop(qn)
+            card.destroy()
 
-        for a in sorted(self.appointments,
-                        key=lambda x: x.get("queue_number", 999)):
-            self._queue_card(a)
+        # Update or create cards for each appointment
+        for qn in sorted(new_numbers):
+            a = new_appointments[qn]
+            if qn in self._queue_cards:
+                self._update_queue_card(self._queue_cards[qn], a)
+            else:
+                self._queue_cards[qn] = self._create_queue_card(a)
 
-    def _queue_card(self, a: dict):
+        # If no appointments, show empty state
+        if not self.appointments and not hasattr(self, "_empty_label"):
+            self._empty_label = ctk.CTkLabel(
+                self._queue_container, text="No appointments today",
+                font=font_tuple("body"), text_color=TEXT_MUTED)
+            self._empty_label.pack(pady=s(20))
+        elif self.appointments and hasattr(self, "_empty_label"):
+            self._empty_label.destroy()
+            del self._empty_label
+
+    def _create_queue_card(self, a: dict):
+        """Create a new queue card and return it."""
         status_colors = {
             "scheduled": (WARNING_BG, WARNING),
             "checked_in": (SUCCESS_BG, SUCCESS),
@@ -332,28 +350,67 @@ class HomeScreen(ctk.CTkFrame):
         card.grid_columnconfigure(3, weight=1)
 
         qn = a.get("queue_number", "?")
-        ctk.CTkLabel(card, text=f"#{qn}",
+        qn_label = ctk.CTkLabel(card, text=f"#{qn}",
                      font=("Inter", max(8, round(20 * 1.0)), "bold"),
                      text_color=TEXT_PRIMARY,
-                     width=s(60)).grid(row=0, column=0, padx=(s(12), s(8)), pady=s(10))
+                     width=s(60))
+        qn_label.grid(row=0, column=0, padx=(s(12), s(8)), pady=s(10))
 
         name = f"{a.get('resident_first_name', '')} {a.get('resident_last_name', '')}".strip()
         display_name = name or a.get("resident_id", "Unknown")[:8]
-        ctk.CTkLabel(card, text=display_name, font=font_tuple("body_bold"),
-                     text_color=TEXT_PRIMARY).grid(row=0, column=1, padx=s(4))
-        ctk.CTkLabel(card, text=a.get("service_name", ""),
-                     font=font_tuple("small"), text_color=TEXT_SECONDARY
-                     ).grid(row=0, column=2, padx=s(8))
+        name_label = ctk.CTkLabel(card, text=display_name, font=font_tuple("body_bold"),
+                     text_color=TEXT_PRIMARY)
+        name_label.grid(row=0, column=1, padx=s(4))
+
+        service_label = ctk.CTkLabel(card, text=a.get("service_name", ""),
+                     font=font_tuple("small"), text_color=TEXT_SECONDARY)
+        service_label.grid(row=0, column=2, padx=s(8))
 
         time_frame = ctk.CTkFrame(card, fg_color="transparent")
         time_frame.grid(row=0, column=3, sticky="e", padx=s(12))
-        ctk.CTkLabel(time_frame, text=to_12_hour(a.get("start_time", "--")),
-                     font=font_tuple("small"), text_color=TEXT_MUTED
-                     ).pack(side="left", padx=(0, s(8)))
+        time_label = ctk.CTkLabel(time_frame, text=to_12_hour(a.get("start_time", "--")),
+                     font=font_tuple("small"), text_color=TEXT_MUTED)
+        time_label.pack(side="left", padx=(0, s(8)))
 
-        ctk.CTkLabel(time_frame, text=a.get("status", ""),
+        status_label = ctk.CTkLabel(time_frame, text=a.get("status", ""),
                      font=font_tuple("tiny"), text_color=sfg,
-                     fg_color=sbg, corner_radius=s(8)).pack(side="left", padx=s(2))
+                     fg_color=sbg, corner_radius=s(8))
+        status_label.pack(side="left", padx=s(2))
+
+        # Store references for later updates
+        card._status_label = status_label
+        card._status_bg = sbg
+        card._status_fg = sfg
+        card._time_label = time_label
+        card._name_label = name_label
+        card._service_label = service_label
+        card._qn_label = qn_label
+
+        return card
+
+    def _update_queue_card(self, card, a: dict):
+        """Update an existing queue card with new appointment data."""
+        status_colors = {
+            "scheduled": (WARNING_BG, WARNING),
+            "checked_in": (SUCCESS_BG, SUCCESS),
+            "completed": (BG_SECONDARY, TEXT_MUTED),
+            "cancelled": (ERROR_BG, ERROR),
+        }
+        sbg, sfg = status_colors.get(a.get("status", "scheduled"),
+                                      (BG_SECONDARY, TEXT_MUTED))
+
+        # Update labels in place
+        name = f"{a.get('resident_first_name', '')} {a.get('resident_last_name', '')}".strip()
+        display_name = name or a.get("resident_id", "Unknown")[:8]
+
+        card._name_label.configure(text=display_name)
+        card._service_label.configure(text=a.get("service_name", ""))
+        card._time_label.configure(text=to_12_hour(a.get("start_time", "--")))
+        card._status_label.configure(text=a.get("status", ""), text_color=sfg, fg_color=sbg)
+
+        # Update stored colors
+        card._status_bg = sbg
+        card._status_fg = sfg
 
     def _on_enroll_link(self):
         if self.on_enroll:
