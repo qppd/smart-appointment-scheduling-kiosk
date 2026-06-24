@@ -21,7 +21,7 @@ from gui.config import (
 class EnrollScreen(ctk.CTkFrame):
     def __init__(self, master, serial_handler, firebase_service,
                  on_complete: callable, on_cancel: callable,
-                 on_user_changed: callable | None = None, **kwargs):
+                 on_user_changed: Optional[callable] = None, **kwargs):
         super().__init__(master, fg_color=BG, **kwargs)
         self.serial_handler = serial_handler
         self.firebase = firebase_service
