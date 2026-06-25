@@ -50,6 +50,9 @@ export default function Login() {
     <div className="max-w-md mx-auto px-4 py-8">
       <MobileBackButton />
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mt-4">
+        <div className="flex justify-center mb-6">
+          <img src="/dolores-logo.png" alt="Barangay Dolores Seal" className="h-20 w-20 object-contain" />
+       </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Sign In</h1>
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start gap-2">

@@ -44,7 +44,10 @@ export default function Home() {
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <span className="text-xl font-bold text-teal-700">Barangay Dolores</span>
+            <Link href="/" className="flex items-center gap-3">
+              <img src="/dolores-logo.png" alt="Barangay Dolores Seal" className="h-10 w-10 object-contain" />
+              <span className="text-xl font-bold text-teal-700">Barangay Dolores</span>
+           </Link>
             <div className="flex items-center gap-4">
               {user ? (
                 <>
@@ -96,6 +99,9 @@ export default function Home() {
 
       <section className="bg-gradient-to-br from-teal-600 to-blue-700 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 text-center">
+          <div className="inline-block p-3 bg-white/95 rounded-full shadow-lg mb-4">
+            <img src="/dolores-logo.png" alt="Barangay Dolores Seal" className="h-24 w-24 object-contain" />
+         </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Barangay Dolores Appointment System</h1>
           <p className="text-xl text-teal-100 mb-8 max-w-2xl mx-auto">
             Skip the long queues. Book your barangay appointments online and check in securely using our fingerprint kiosk.

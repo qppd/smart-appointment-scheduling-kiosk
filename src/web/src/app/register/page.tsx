@@ -55,6 +55,9 @@ export default function Register() {
     <div className="max-w-2xl mx-auto px-4 py-12">
       <MobileBackButton />
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="flex justify-center mb-6">
+          <img src="/dolores-logo.png" alt="Barangay Dolores Seal" className="h-16 w-16 object-contain" />
+      </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Register Your Account</h1>
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-start gap-2">

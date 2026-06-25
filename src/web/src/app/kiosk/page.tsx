@@ -17,7 +17,9 @@ export default function KioskPortal() {
   return (
     <div>
       <div className="bg-gradient-to-r from-teal-600 to-blue-700 text-white py-12 text-center">
-        <Fingerprint className="h-16 w-16 mx-auto mb-4" />
+        <div className="inline-block p-2 bg-white/95 rounded-full shadow-md mb-4">
+          <img src="/dolores-logo.png" alt="Barangay Dolores Seal" className="h-20 w-20 object-contain" />
+       </div>
         <h1 className="text-4xl font-bold mb-2">Kiosk Portal</h1>
         <p className="text-teal-100 text-lg">Today's Schedule</p>
       </div>
