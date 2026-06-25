@@ -34,6 +34,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Claude
+.claude/
+
 # Firebase/Google service account keys
 firebase-adminsdk-*.json
 sask-dc973-firebase-adminsdk-fbsvc-63fed4c5b4.json
