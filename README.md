@@ -1,46 +1,63 @@
 # Smart Appointment Scheduling Kiosk
 
-Web (Next.js + Firebase RTDB) → RPi4 (pyrebase4) → ESP32 (Fingerprint Sensor via Micro USB)
+A complete appointment scheduling and biometric check-in system designed for Barangay (community-level government) service management in the Philippines. Residents book appointments online via a web application and check in at a physical kiosk using fingerprint biometrics.
 
-## Architecture
+---
+
+## Quick Overview
+
+**Architecture:** Web (Next.js + Firebase RTDB) → RPi4 (Python + customtkinter) → ESP32 (Fingerprint Sensor via Micro USB)
 
 ```
-┌─────────────┐      ┌──────────────┐      ┌─────────┐      ┌──────┐
-│  Next.js    │ ──▶ │  Firebase    │ ◀──  │  RPi4   │ ──▶ │ ESP32│
-│  (Vercel)   │      │  Auth + RTDB │      │ Headless│      │ AS608│
-│             │ ◀──  │              │ ──▶  │ Service │      │Sensor│
-└─────────────┘      └──────────────┘      └─────────┘      └──────┘
+                    +------------------+       +------------------+       +------------------+
+                    |   Web Browser   |       |   RPi4 Kiosk     |       |   ESP32 + AS608  |
+                    |   (Next.js 14)  |       |   (Python GUI)   |       |   (Arduino C++)  |
+                    +--------+---------+       +--------+---------+       +------------------+
+                             |                         |
+                             |    HTTPS/REST/WSS       |    Serial (115200 baud)
+                             v                         v
+                    +--------+---------+       +--------+---------+
+                    |                                      |
+                    |   Firebase Cloud Platform             |
+                    |   - Authentication (Email/Password)    |
+                    |   - Realtime Database (RTDB)          |
+                    |                                      |
+                    +--------------------------------------+
 ```
 
-### Data Flow
-1. Resident books appointment via web app → writes to Firebase Realtime Database (RTDB)
-2. RPi4 polls RTDB `kiosk_commands` every 2 seconds via pyrebase4
-3. ESP32 fingerprints → RPi4 writes result back to RTDB
-4. Web app displays real-time updates via RTDB listeners
+---
 
-## Components
+## System Architecture
 
-### 1. Web App (`src/web/`)
-- **Framework:** Next.js 14 (App Router)
-- **Auth:** Firebase Authentication (Email/Password)
-- **Database:** Firebase Realtime Database (RTDB)
-- **Styling:** Tailwind CSS
-- **Deploy:** Vercel
+The system consists of **4 architectural tiers**:
 
-### 2. RPi Service (`src/rpi/`)
-- **Runtime:** Python 3
-- **Firebase:** `pyrebase4` (REST API + email/password auth)
-- **Serial:** `pyserial` for ESP32 communication via micro USB (`/dev/ttyUSB0` or `/dev/ttyACM0`)
-- **Mode:** Headless daemon (no GUI)
+| Tier | Technology | Role |
+|------|-----------|------|
+| **Web Application** | Next.js 14, React 18, TypeScript, Tailwind CSS | Online booking, admin dashboard, public queue display |
+| **Cloud Services** | Firebase Auth + Realtime Database | Real-time data sync, authentication, command queue |
+| **Kiosk Host** | Raspberry Pi 4, Python 3, customtkinter | Touchscreen GUI, serial communication, Firebase polling |
+| **Embedded Hardware** | ESP32, AS608 Fingerprint Sensor | Fingerprint enrollment, 1:N matching, template storage |
 
-### 3. ESP32 Firmware (`src/esp/`)
-- **Library:** Adafruit Fingerprint Sensor Library
-- **Connection:** Micro USB cable to RPi4 (serial /dev/ttyUSB0)
-- **Protocol:** UART (115200 baud)
-- **Sensor:** AS608 fingerprint sensor
-- **Stability:** Watchdog-friendly with `yield()` in loops
+For detailed architecture documentation, see:
+- [System Architecture](docs/system-architecture.md) — Full architecture overview, deployment diagrams, security architecture
+- [Component Details](docs/components.md) — Deep dive into every component, its responsibilities, and interfaces
+- [Technology Stack](docs/tech-stack.md) — Complete inventory of all technologies, libraries, and dependencies
+- [Flow Diagrams](docs/flow-diagrams.md) — Sequence diagrams, flowcharts, and data flow visuals
+- [Hardware & Software Specs](docs/specifications.md) — Detailed hardware and software specifications
+- [Software Requirements](docs/software-requirements.md) — Functional and non-functional requirements (SRS)
 
-## Firebase Realtime Database (RTDB) Data Schema
+---
+
+## Data Flow
+
+1. **Resident books appointment** via web app → writes to Firebase Realtime Database (RTDB)
+2. **RPi4 polls RTDB** `kiosk_commands` every 2 seconds via firebase-admin
+3. **ESP32 processes fingerprints** → RPi4 writes result back to RTDB
+4. **Web app displays** real-time updates via RTDB listeners
+
+---
+
+## Firebase Realtime Database (RTDB) Schema
 
 ```
 users/{uid}             - Resident profiles (auth-linked)
@@ -70,6 +87,70 @@ kiosk_status/{kiosk_id}  - RPi4 heartbeat & status
   - online, last_heartbeat, esp32_connected, template_count
 ```
 
+For the full database schema documentation, see [docs/database/database-schema.md](docs/database/database-schema.md).
+
+---
+
+## Components
+
+```
+smart-appointment-scheduling-kiosk/
+├── README.md
+├── docs/
+│   ├── system-architecture.md    ← New: Full architecture docs
+│   ├── components.md               ← New: Component-level details
+│   ├── tech-stack.md               ← New: Technology inventory
+│   ├── flow-diagrams.md            ← New: Sequence & flow diagrams
+│   ├── specifications.md           ← New: Hardware & software specs
+│   ├── software-requirements.md    ← New: Requirements specification
+│   ├── api/api-spec.md
+│   ├── database/database-schema.md
+│   ├── development/dev-guide.md
+│   ├── hardware/hardware-setup.md
+│   ├── setup/setup-guide.md
+│   └── rpi-systemd/kiosk-firebase.service
+├── src/
+│   ├── web/              # Next.js 14 web application
+│   ├── rpi/              # Raspberry Pi 4 kiosk application
+│   └── esp/              # ESP32 firmware (Arduino C++)
+└── model/                # 3D enclosure renders
+```
+
+---
+
+## Tech Stack
+
+### Web Application
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Next.js | ^14.2.7 | React framework with App Router |
+| React | ^18.3.1 | UI library |
+| TypeScript | ^5.5.4 | Static typing |
+| Tailwind CSS | ^3.4.10 | Utility-first CSS |
+| Firebase SDK | ^10.13.0 | Auth + RTDB |
+| date-fns | ^3.6.0 | Date formatting |
+| lucide-react | ^0.439.0 | Icon library |
+
+### Raspberry Pi 4 Kiosk
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Python 3 | 3.12+ | Runtime |
+| customtkinter | ^5.2.2 | Modern GUI |
+| firebase-admin | ^6.5.0 | Firebase Admin SDK |
+| pyserial | ^3.5 | Serial communication |
+| Pillow | ^10.4.0 | Image processing |
+| python-dotenv | ^1.0.1 | Environment variables |
+
+### ESP32 Firmware
+| Technology | Purpose |
+|------------|---------|
+| Arduino Core (ESP32) | Microcontroller framework |
+| Adafruit Fingerprint Sensor Library | AS608 sensor communication |
+
+For the complete dependency list and version rationale, see [docs/tech-stack.md](docs/tech-stack.md).
+
+---
+
 ## Deployment
 
 ### Web (Vercel)
@@ -78,7 +159,7 @@ kiosk_status/{kiosk_id}  - RPi4 heartbeat & status
 3. Copy `.env.example` to `.env.local` and fill in your Firebase config (including `NEXT_PUBLIC_FIREBASE_DATABASE_URL`)
 4. Deploy to Vercel
 
-### RPi4 (Headless Service)
+### RPi4 (Kiosk Service)
 1. Create a kiosk user in Firebase Authentication (email/password)
 2. Create `.env` with your Firebase and auth credentials (see `.env.example`)
 3. Install Python dependencies: `pip install -r src/rpi/requirements.txt`
@@ -102,6 +183,10 @@ kiosk_status/{kiosk_id}  - RPi4 heartbeat & status
 4. Upload `fingerprint_controller.ino`
 5. Verify in Serial Monitor: `OK:ESP32 ready`
 
+For detailed setup instructions, see [docs/setup/setup-guide.md](docs/setup/setup-guide.md) and [docs/hardware/hardware-setup.md](docs/hardware/hardware-setup.md).
+
+---
+
 ## Development
 
 ### Web App
@@ -118,12 +203,38 @@ pip install -r requirements.txt
 python main.py        # Ensure .env file is in the directory
 ```
 
+### ESP32 Firmware
+See [src/esp/README.md](src/esp/README.md) and [src/esp/uart_protocol.md](src/esp/uart_protocol.md) for detailed Arduino IDE setup and UART protocol reference.
+
+---
+
 ## Troubleshooting
 
-- **RPi can't connect to Firebase:** Check `KIOSK_EMAIL` and `KIOS Slip to build pyrebase4; try `pip install --upgrade setuptools
+- **RPi can't connect to Firebase:** Check `KIOSK_EMAIL` and `KIOSK_PASSWORD` in `.env`; verify internet connectivity
 - **RPi can't connect to ESP32:** Verify serial port with `ls /dev/ttyUSB* /dev/ttyACM*`
 - **Web app Firebase errors:** Ensure `.env.local` has all required `NEXT_PUBLIC_FIREBASE_*` variables
 - **ESP32 watchdog reset:** Firmware includes `yield()` in loops; verify using stable power supply
+
+---
+
+## Documentation Index
+
+| Document | Purpose |
+|----------|---------|
+| [System Architecture](docs/system-architecture.md) | Full system architecture, deployment diagrams, security architecture |
+| [Component Details](docs/components.md) | Component-level breakdown, interfaces, dependencies |
+| [Technology Stack](docs/tech-stack.md) | Complete technology inventory with versions and rationale |
+| [Flow Diagrams](docs/flow-diagrams.md) | Sequence diagrams, flowcharts, data flow visuals |
+| [Hardware & Software Specs](docs/specifications.md) | Detailed hardware and software specifications |
+| [Software Requirements](docs/software-requirements.md) | Functional and non-functional requirements (SRS) |
+| [Setup Guide](docs/setup/setup-guide.md) | Step-by-step installation and configuration |
+| [Hardware Setup](docs/hardware/hardware-setup.md) | Wiring diagrams and assembly instructions |
+| [Database Schema](docs/database/database-schema.md) | Firebase RTDB schema documentation |
+| [API Specification](docs/api/api-spec.md) | REST API endpoint documentation |
+| [Development Guide](docs/development/dev-guide.md) | Development workflow and architecture |
+| [ESP32 UART Protocol](src/esp/uart_protocol.md) | Serial communication protocol reference |
+
+---
 
 ## Files Changed Summary
 
@@ -137,3 +248,9 @@ python main.py        # Ensure .env file is in the directory
 | `src/rpi/services/serial_handler.py` | Updated | Auto-reconnect + ACM detection for micro USB |
 | `src/rpi/services/command_processor.py` | Created | Maps commands → ESP32 serial |
 | `src/esp/fingerprint_controller.ino` | Updated | Watchdog stability fixes |
+| `docs/system-architecture.md` | Created | Comprehensive system architecture documentation |
+| `docs/components.md` | Created | Detailed component breakdown |
+| `docs/tech-stack.md` | Created | Complete technology and library inventory |
+| `docs/flow-diagrams.md` | Created | Flowcharts and sequence diagrams |
+| `docs/specifications.md` | Created | Hardware and software specifications |
+| `docs/software-requirements.md` | Created | Software requirements specification (SRS) |

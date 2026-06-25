@@ -13,7 +13,6 @@ from gui.config import (
     s, font_tuple, RESULT_AUTO_RETURN, to_12_hour,
 )
 
-
 class ResultScreen(ctk.CTkFrame):
     def __init__(self, master: ctk.CTk, on_done: callable,
                  on_retry: callable, **kwargs):
