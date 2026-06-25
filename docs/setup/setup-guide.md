@@ -16,6 +16,49 @@
 
 ---
 
+## Setup Flow Overview
+
+```mermaid
+flowchart TB
+    subgraph Phase1["Phase 1: Cloud Setup"]
+        A["Create Firebase Project"] --> B["Enable Auth + RTDB"]
+        B --> C["Configure Security Rules"]
+    end
+
+    subgraph Phase2["Phase 2: Web Application"]
+        D["Install Dependencies"] --> E["Configure .env.local"]
+        E --> F["Develop & Test Locally"]
+        F --> Gtrs to] G["Deploy to Vercel"]
+    end
+
+    subgraph Phase3["Phase 3: RPi4 Kiosk"]
+        H["Flash Raspberry Pi OS"] --> I["Enable Serial Port"]
+        I --> J["Install Python Packages"]
+        J --> K["Configure .env"]
+        K --> L["Set up systemd Service"]
+    end
+
+    subgraph Phase4["Phase 4: ESP32 Firmware"]
+        M["Install Arduino IDE + ESP32 Support"] --> N["Wire AS608 to ESP32"]
+        N --> O["Upload firmware_controller.ino"]
+    end
+
+    subgraph Phase5["Phase 5: Verification"]
+        P["Test booking flow"] --> Q["Test fingerprint check-in"]
+        Q --> R["Verify real-time sync"]
+    end
+
+    Phase1 --> Phase2 --> Phase3 --> Phase4 --> Phase5
+
+    style Phase1 fill:#e3f2fd,stroke:#1565c0
+    style Phase2 fill:#e8f5e9,stroke:#2e7d32
+    style Phase3 fill:#fff3e0,stroke:#e65100
+    style Phase4 fill:#f3e5f5,stroke:#7b1fa2
+    style Phase5 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+```
+
+---
+
 ## 1. Firebase Setup
 
 Before deploying the web app or kiosk, you need to create and configure a Firebase project.
@@ -70,8 +113,6 @@ Before deploying the web app or kiosk, you need to create and configure a Fireba
 
 ```bash
 cd src/web
-
-# Install packages
 npm install
 ```
 
@@ -119,34 +160,27 @@ vercel --prod
 1. Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
 2. Select **Raspberry Pi OS Lite (64-bit)**
 3. Write to your MicroSD card (minimum 32GB)
-4. Insert the MicroSD card into your Raspberry Pi 4
+4. Insert into your Raspberry Pi 4
 5. Boot up with Ethernet or Wi-Fi configured
 
 ### 3.2 Enable Serial Port
 
 ```bash
-# Open raspi-config
 sudo raspi-config
 ```
 
 Navigate to: **Interface Options > Serial Port**
-- Select **No** for "Login shell over serial"
-- Select **Yes** for "Serial port hardware"
+- **No** - "Would you like a login shell to be accessible over serial?"
+- **Yes** - "Would you like the serial port hardware to be enabled?"
 
 ```bash
-# Reboot
 sudo reboot
 ```
 
 ### 3.3 Install Python Dependencies
 
 ```bash
-# On the Raspberry Pi
 cd src/rpi
-
-# Install Python 3 and pip (if not already installed)
-sudo apt update
-sudo apt install -y python3-pip python3-tk  python3-venv git
 
 # Create virtual environment (recommended)
 python3 -m venv venv
@@ -165,18 +199,11 @@ cp .env.example .env
 Edit `.env`:
 
 ```bash
-# Firebase service account path
 FIREBASE_CREDENTIALS=/path/to/firebase-service-account.json
-
-# Firebase project details
 FIREBASE_DATABASE_URL=https://your_project_id-default-rtdb.firebaseio.com
 FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-
-# Serial port for ESP32
 SERIAL_PORT=/dev/ttyUSB0
 SERIAL_BAUD=115200
-
-# Kiosk identification
 KIOSK_ID=kiosk_main
 ```
 
@@ -232,7 +259,7 @@ sudo journalctl -u kiosk-firebase -f
 ### 4.2 Install Libraries
 
 Open **Tools > Manage Libraries** and install:
-- **Adafruit Fingerprint Sensor Library**
+¼- **Adafruit Fingerprint Sensor Library**
 - **Adafruit BusIO** (dependency)
 
 ### 4.3 Upload Firmware
@@ -263,26 +290,52 @@ OK:ESP32 ready
 
 Use this checklist to verify everything is set up correctly:
 
-| Step | Check | Status |
-|------|-------|--------|
-| Firebase project created | Yes / No | |
-| Email/Password auth enabled | Yes / No | |
-| RTDB security rules set | Yes / No | |
-| Web app env vars configured | Yes / No | |
-| Web app runs locally | Yes / No | |
-| Web app deployed to Vercel | Yes / No | |
-| RPi4 OS installed and booted | Yes / No | |
-| Serial port enabled on RPi4 | Yes / No | |
-| Python packages installed | Yes / No | |
-| RPi4 .env configured | Yes / No | |
-| ESP32 connected to RPi4 | Yes / No | |
-| AS608 wired to ESP32 | Yes / No | |
-| ESP32 firmware uploaded | Yes / No | |
-| Serial monitor shows "OK:ESP32 ready" | Yes / No | |
-| systemd service active | Yes / No | |
-| Web app can send commands to kiosk | Yes / No | |
-| Fingerprint enrollment works | Yes / No | |
-| Fingerprint verification works | Yes / No | |
+```mermaid
+flowchart TB
+    subgraph Checklist["Setup Verification"]
+        direction TB
+        A["Firebase project created"] --> B["Email/Password auth enabled"]
+        B --> C["RTDB security rules set"]
+        C --> D["Web app env vars configured"]
+        D --> E["Web app runs locally"]
+        E --> F["Web app deployed to Vercel"]
+        F --> G["RPi4 OS installed and booted"]
+        G --> H["Serial port enabled on RPi4"]
+        H --> I["Python packages installed"]
+        I --> J["RPi4 .env configured"]
+        J --> K["ESP32 connected to RPi4"]
+        K --> L["AS608 wired to ESP32"]
+        L --> M["ESP32 firmware uploaded"]
+        M --> N["Serial monitor shows OK:ESP32 ready"]
+        N --> O["systemd service active"]
+        O --> P["Web app can send commands to kiosk"]
+        P --> Q["Fingerprint enrollment works"]
+        Q --> R["Fingerprint verification works"]
+    end
+
+   共分 style R fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+```
+
+| # | Step | Status |
+|---|------|--------|
+| 1 | Firebase project created | [ ] |
+| 2 | Email/Password auth enabled | [ ] |
+| 3 | RTDB security rules set | [ ] |
+| 4 | Web app env vars configured | [ ] |
+| 5 | Web app runs locally | [ ] |
+| 6 | Web app deployed to Vercel | [ ] |
+| 7 | RPi4 OS installed and booted | [ ] |
+| 8 | Serial port enabled on RPi4 | [ ] |
+| 9 | Python packages installed | [ ] |
+| 10 | RPi4 .env configured | [ ] |
+| 11 | ESP32 connected to RPi4 | [ ] |
+| 12 | AS608 wired to ASP608 | [ ] |
+| 13 | ESP32 firmware uploaded | [ ] |
+| 14 | "OK:ESP32 ready" in Serial Monitor | [ ] |
+| 15 | systemd service active | [ ] |
+| 16 | Web app can send commands to kiosk | [ ] |
+| 17 | Fingerprint enrollment works | [ ] |
+| 18 | Fingerprint verification works | [ ] |
 
 ---
 
@@ -290,11 +343,11 @@ Use this checklist to verify everything is set up correctly:
 
 | Issue | Solution |
 |-------|----------|
+| Web app Firebase errors | Ensure all `NEXT_PUBLIC_*` env vars are set; check Firebase console |
 | RPi4 cannot connect to Firebase | Check `.env` values; verify internet; check service account JSON permissions |
 | ESP32 not detected | Check `ls /dev/ttyUSB*` or `ls /dev/ttyACM*`; try different USB cable/port |
 | AS608 sensor not responding | Verify wiring (VCC to 3.3V); check baud rate (57600); check GND connection |
-| Web app cannot write to RTDB | Check security rules; ensure user is authenticated |
 | Touchscreen not working | Check HDMI and USB connections; calibrate if needed |
 | systemd service fails to start | Run `sudo journalctl -u kiosk-firebase -f` to see error |
-| ESP32 watchdog reset | Add `delay()` or `yield()` in loops; ensure stable power supply |
 | "Permission Denied" in RTDB | Check security rules; ensure auth is active |
+| ESP32 watchdog reset | Add `yield()` in loops; ensure stable power supply |

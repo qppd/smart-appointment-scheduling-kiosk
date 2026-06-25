@@ -17,51 +17,107 @@
 
 ---
 
+## System Wiring Overview
+
+```mermaid
+graph TD
+    subgraph RPi["Raspberry Pi 4"]
+        R["RPi4 GPIO + USB Host"]
+    end
+
+    subgraph TS["Touchscreen LCD"]
+        T["7-inch Display"]
+    end
+
+    subgraph ESP["ESP32 Dev Module"]
+        E["Microcontroller Board"]
+    end
+
+    subgraph FP["AS608 Fingerprint Sensor"]
+        F["Optical Sensor"]
+    end
+
+    R ---|HDMI| T
+    R ---|USB| T
+    R ---|Micro USB Data Cable| E
+    E ---|UART 57600 baud| F
+
+    style RPi fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style TS fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style ESP fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style FP fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+```
+
 ## Wiring Diagrams
 
 ### 1. ESP32 to AS608 Fingerprint Sensor
 
 **IMPORTANT:** The AS608 sensor operates at **3.3V ONLY**. Do NOT connect to 5V.
 
-| ESP32 Pin | AS608 Pin | Wire Color |
-|-----------|-----------|------------|
-| 3.3V | VCC | Red |
-| GND | GND | Black |
-| GPIO16 (RX2) | TX (White wire) | White |
-| GPIO17 (TX2) | RX (Green wire) | Green |
+| ESP32 Pin | AS608 Pin | Wire Color | Description |
+|-----------|-----------|------------|-------------|
+| 3.3V | VCC | Red | Power supply (3.3V) |
+| GND | GND | Black | Ground |
+| GPIO16 (RX2) | TX (White) | White | Serial data from AS608 |
+| GPIO17 (TX2) | RX (Green) | Green | Serial data to AS608 |
 
-```
-       ESP32 Dev Module                AS608 Sensor
-      +------------------+           +------------+
-      |                  |           |            |
-      | 3.3V  -----------+----> Red   |  VCC       |
-      |                  |           |            |
-      | GND   -----------+----> Black |  GND       |
-      |                  |           |            |
-      | GPIO16 (RX2)     |<---+ White|  TX        |
-      |                  |           |            |
-      | GPIO17 (TX2)     +---> Green |  RX        |
-      |                  |           |            |
-      +------------------+           +------------+
+```mermaid
+graph LR
+    subgraph ESP32["**ESP32 Dev Module**"]
+        P1["**3.3V**
+        Power"]
+        P2["**GND**
+        Ground"]
+        P3["**GPIO16**
+        RX2"]
+        P4["**GPIO17**
+        TX2"]
+    end
+
+    subgraph AS608["**AS608 Sensor**"]
+        Q1["**VCC"
+        Power"]
+        Q2["**GND**
+        Ground"]
+        Q3["**TX**
+        Transmit"]
+        Q4["**RX**
+        Receive**"]
+    end
+
+    P1 -.->|Red| Q1
+    P2 -.->| BuildingBlack| Q2
+    P3 -.->|White| Q3
+    P4 -.->|Green| Q4
+
+    style ESP32 fill:#fff3e0,stroke:#e65100
+    style AS608 fill:#f3e5f5,stroke:#7b1fa2
 ```
 
 ### 2. ESP32 to Raspberry Pi 4
 
-The ESP32 connects to the RPi4 via **micro USB cable**. The RPi4 automatically recognizes the ESP32 as a serial device (typically `/dev/ttyUSB0` or `/dev/ttyACM0`).
+The ESP32 connects to the RPi4 via **micro USB cable**.
 
-```
-       RPi4                      ESP32 Dev Module
-   +---------+                +------------------+
-   |         |                |                  |
-   | USB Stateless USB Host   |  Micro USB Port  |
-   |  /dev/ttyUSB0            +---------+--------+
-   |         |                          |
-   |  USB    |<===========================>
-   |  Cable  |    Micro USB Cable
-   +---------+
+```mermaid
+graph LR
+    subgraph RPi["**Raspberry Pi 4**"]
+        P["USB Port
+        ***/dev/ttyUSB0***"]
+    end
+
+    subgraph ESP["**ESP32 Dev Module**"]
+        E["Micro USB Port
+        ***USB-to-UART***"]
+    end
+
+    P -->|"Micro USB
+        Data Cable"| E
+
+    style RPi fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style ESP fill:#fff3e0,stroke:#e65100,stroke-width:2px
 ```
 
-**You do NOT need to connect UART/GPIO pins directly** for this project. The ESP32 and RPi4 communicate over USB Serial at 115200 baud.
+**You do NOT need to connect UART/GPIO pins directly.** The ESP32 and RPi4 communicate over USB Serial at 115200 baud.
 
 ### 3. Touchscreen to RPi4
 
@@ -71,20 +127,69 @@ The ESP32 connects to the RPi4 via **micro USB cable**. The RPi4 automatically r
 | USB Port | USB (Touch) |
 | 5V/GND (via GPIO) | Power (if not HDMI-powered) |
 
+```mermaid
+graph LR
+    subgraph RPi["**Raspberry Pi 4**"]
+        HDMI["HDMI Port"]
+        USB["USB Port"]
+    end
+
+    subgraph TS["**Touchscreen LCD**"]
+        T1["HDMI Input"]
+        T2["USB TouchLL touch"]
+        T3["Display Panel"]
+    end
+
+    HDMI -->|HDMI Cable| T1
+    USB -->|USB Cable| T2
+    T1 --> T3
+    T2 --> T3
+
+    style RPi fill:#e3f2fd,stroke:#1565c0
+    style TS fill:#e8f5e9,stroke:#2e7d32
+```
+
 ### 4. Power Connections
 
-| Device | Power Input | Connection |
-|--------|------------|------------|
-| RPi4 | 5V/3A | USB-C power adapter |
-| Touchscreen | 5V | From RPi4 USB (or GPIO) |
-| ESP32 | 5V (via USB) | From RPi4 USB (or external) |
-| AS608 | 3.3V | From ESP32 3.3V pin |
+| Device | Power Input | Connection | Source |
+|--------|------------|------------|--------|
+| RPi4 | 5V/3A | USB-C power adapter | Wall socket |
+| Touchscreen | 5V | USB (or GPIO) | RPi4 |
+| ESP32 | 5V | Via USB | RPi4 (or external) |
+| AS608 | 3.3V | Jumper wire | ESP32 |
+
+```mermaid
+graph LR
+    PS["**Wall Socket**
+    220V AC"] --> ADAPTER["**USB-C Adapter**
+    5V/3A"]
+    ADAPTER --> RPI["**Raspberry Pi 4**"]
+    RPI -->|USB Power| TS["**Touchscreen**
+    5V USB"]
+    RPI -->|USB Data/Power| ESP["**ESP32**
+    5V USB"]
+    ESP -->|3.3V| AS608["**AS608**
+    3.3V ONLY!"]
+
+    style PS fill:#ffebee,stroke:#c62828
+    style AS608 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+```
 
 ---
 
 ## Assembly Steps
 
 ### Step 1: Prepare the Raspberry Pi 4
+
+```mermaid
+flowchart LR
+    A["Raspberry Pi Imager"] -->|Flash OS| B["MicroSD Card\n32GB, Class 10"]
+    B --> C["Insert into RPi4"]
+    C --> D["Boot with\nEthernet/WiFi"]
+
+    style A fill:#e3f2fd,stroke:#1565c0
+    style D fill:#e8f5e9,stroke:#2e7d32
+```
 
 1. Flash Raspberry Pi OS Lite (64-bit) to the MicroSD card using [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
 2. Enable SSH and Wi-Fi (if needed) before first boot
@@ -94,7 +199,7 @@ The ESP32 connects to the RPi4 via **micro USB cable**. The RPi4 automatically r
 ### Step 2: Connect the Touchscreen
 
 1. Connect the touchscreen to the RPi4 using an **HDMI cable**
-2. Connect the touchscreenachtouchscreen's USB cable to any RPi4 USB port
+2. Connect the touchscreen's USB cable to any RPi4 USB port
 3. Power up the display and verify touch input works
 
 ### Step 3: Wire the AS608 to the ESP32
@@ -159,7 +264,7 @@ sudo apt install -y python3-pip python3-venv python3-tk git curl
 
 ### Enable Auto-Login
 
-```
+```bash
 sudo raspi-config
 # System Options > Boot / Auto Login > Console Autologin
 ```

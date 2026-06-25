@@ -6,6 +6,54 @@ The Smart Appointment Scheduling Kiosk system consists of four primary tiers wit
 
 ---
 
+## System Architecture (Component View)
+
+```mermaid
+graph TD
+    subgraph Tier1["Tier 1: Web Application"]
+        W1["Next.js 14 App Router"]
+        W2["React 18 + TypeScript"]
+        W3["Tailwind CSS"]
+        W4["Firebase Web SDK"]
+    end
+
+    subgraph Tier2["Tier 2: Firebase Platform"]
+        F1["Authentication"]
+        F2["Realtime Database"]
+        F3["Admin SDK"]
+    end
+
+    subgraph Tier3["Tier 3: Raspberry Pi 4 Kiosk"]
+        R1["Python 3 + customtkinter"]
+        R2["firebase-admin"]
+        R3["pyserial"]
+        R4["Touchscreen GUI"]
+    end
+
+    subgraph Tier4["Tier 4: Embedded Hardware"]
+        E1["ESP32 Dev Module"]
+        E2["AS608 Sensor"]
+    end
+
+    W1 --> W4
+    W4 --> F1
+    W4 --> F2
+    R1 --> R2
+    R2 --> F3
+    R3 --> F2
+    R1 --> R3
+    R3 --> E1
+    E1 --> E2
+    F3 --> F2
+
+    style Tier1 fill:#e3f2fd,stroke:#1565c0
+    style Tier2 fill:#e8f5e9,stroke:#2e7d32
+    style Tier3 fill:#fff3e0,stroke:#e65100
+    style Tier4 fill:#f3e5f5,stroke:#7b1fa2
+```
+
+---
+
 ## Tier 1: Web Application (src/web/)
 
 ### 1.1 Next.js Application (`src/web/src/app/`)
@@ -28,10 +76,28 @@ The Smart Appointment Scheduling Kiosk system consists of four primary tiers wit
 | `my-appointments/page.tsx` | `/my-appointments` | Manage appointments, OTP enrollment |
 | `profile/page.tsx` | `/profile` | Edit resident profile |
 | `kiosk/page.tsx` | `/kiosk` | Public queue display (read-only) |
-| `dolores-taytay-admin/page.tsx` | `/dolores-taytay-admin` | Admin dashboard (Services, Queues, Residents, Stats) |
-| `settings/page.tsx` | `/settings` | System settings (Kiosk Mgmt, Notifications, Security, Preferences) |
+| `dolores-taytay-admin/page.tsx` | `/dolores-taytay-admin` | Admin dashboard |
+| `settings/page.tsx` | `/settings` | System settings |
 
 ### 1.2 Library Components (`src/web/src/lib/`)
+
+```mermaid
+graph LR
+    A["**Library Components**"] --> B["firebase.ts
+    *Initialize Firebase*"]
+    A --> C["auth.ts
+    *Auth Functions*"]
+    A --> D["AuthContext.tsx
+    *Auth State + Cache*"]
+    A --> E["rtdb.ts
+    *CRUD + Subscriptions*"]
+    A --> F["useAuthGuard.ts
+    *Route Protection*"]
+    A --> G["utils.ts
+    *Helpers*"]
+
+    style A fill:#e3f2fd,stroke:#1565c0
+```
 
 | Component | File | Purpose |
 |-----------|------|---------|
@@ -67,6 +133,28 @@ The Smart Appointment Scheduling Kiosk system consists of four primary tiers wit
 | **Action** | Creates the root window, initializes the KioskApp |
 
 ### 2.2 GUI Layer (`src/rpi/gui/`)
+
+```mermaid
+graph TD
+    A["**KioskApp** / app.py"] --> B["**Home Screen**
+    home.py"]
+    A --> C["**Verify Screen**
+    verify.py"]
+    A --> D["**Enroll Screen**
+    enroll.py"]
+    A --> E["**OTP Enroll**
+    otp_enroll.py"]
+    A --> F["**Result Screen**
+    result.py"]
+    A --> G["**Admin Panel**
+    admin.py"]
+    A --> H["**Virtual Keyboard**
+    virtual_keyboard.py"]
+    A --> I["**Config**
+    config.py"]
+
+    style A fill:#fff3e0,stroke:#e65100,stroke-width:2px
+```
 
 #### KioskApp (`app.py`)
 
@@ -141,6 +229,16 @@ The Smart Appointment Scheduling Kiosk system consists of four primary tiers wit
 
 ### 2.3 Services Layer (`src/rpi/services/`)
 
+```mermaid
+graph LR
+    A["**Services**"] --> B["serial_handler.py
+    *Serial Communication*"]
+    A --> C["command_processor.py
+    *Command Mapping*"]
+
+    style A fill:#fff3e0,stroke:#e65100
+```
+
 #### Serial Handler (`serial_handler.py`)
 
 | Property | Details |
@@ -149,15 +247,15 @@ The Smart Appointment Scheduling Kiosk system consists of four primary tiers wit
 | **Features** | Auto-detect serial port, auto-reconnect on disconnect, send/receive |
 
 **Interface:**
-```python
-# Commands sent to ESP32
-ENROLL:<template_id>      # Enroll fingerprint to ID
-VERIFY                      # Verify fingerprint (1:N match)
-DELETE:<template_id>       # Delete specific template
-LIST                        # List all stored templates
-COUNT                       # Get template count
-STATUS                      # Get ESP32 status
-```
+
+| Command | Format | Description |
+|---------|--------|-------------|
+| `ENROLL:<id>` | `ENROLL:5` | Enroll fingerprint to template ID |
+| `VERIFY` | `VERIFY` | Verify fingerprint (1:N match) |
+| `DELETE:<id>` | `DELETE:5` | Delete specific template |
+| `LIST` | `LIST` | List all stored templates |
+| `COUNT` | `COUNT` | Get template count |
+| `STATUS` | `STATUS` | Get ESP32 status |
 
 #### Command Processor (`command_processor.py`)
 
@@ -170,6 +268,23 @@ STATUS                      # Get ESP32 status
 
 ## Tier 3: ESP32 Firmware (src/esp/)
 
+```mermaid
+graph LR
+    A["**ESP32 Firmware**"] --> B["fingerprint_controller.ino
+    *Main Sketch*"]
+    A --> C["FingerprintAS608.cpp/.h
+    *Sensor Wrapper*"]
+    B --> D["**Serial Command Parser**"]
+    D --> E["ENROLL Handler"]
+    D --> F["VERIFY Handler"]
+    D --> G["DELETE Handler"]
+    D --> H["LIST Handler"]
+    D --> I["COUNT Handler"]
+
+    style A fill:#f3e5f5,stroke:#7b1fa2
+    style B fill:#f3e5f5,stroke:#7b1fa2
+```
+
 ### 3.1 Main Sketch (`fingerprint_controller/fingerprint_controller.ino`)
 
 | Property | Details |
@@ -177,9 +292,6 @@ STATUS                      # Get ESP32 status
 | **Platform** | Arduino Framework (C++) |
 | **Board** | ESP32 Dev Module |
 | **Purpose** | Main firmware handling serial commands and sensor operations |
-
-**Command Parser:**
-Listens on Serial (UART) for commands from RPi4 and dispatches to appropriate handlers.
 
 ### 3.2 FingerprintAS608 Class (`fingerprint_controller/FingerprintAS608.cpp` / `.h`)
 
@@ -189,14 +301,15 @@ Listens on Serial (UART) for commands from RPi4 and dispatches to appropriate ha
 | **Purpose** | C++ wrapper around Adafruit Fingerprint Sensor Library |
 
 **Methods:**
-```cpp
-bool begin(Stream* serial, uint32_t baud);     // Initialize sensor
-uint8_t enroll(uint16_t id);                     // Enroll to template ID
-int16_t verify();                                // 1:N matching, returns ID or -1
-uint8_t deleteTemplate(uint16_t id);             // Delete template by ID
-uint16_t getTemplateCount();                     // Get stored template count
-void listTemplates();                            // List all template IDs
-```
+
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `begin()` | `Stream* serial`, `uint32_t baud` | Initialize sensor |
+| `enroll()` | `uint16_t id` | Enroll to template ID |
+| `verify()` | None | 1:N matching, returns ID or -1 |
+| `deleteTemplate()` | `uint16_t id` | Delete template by ID |
+| `getTemplateCount()` | None | Get stored template count |
+| `listTemplates()` | None | List all template IDs |
 
 ### 3.3 AS608 Fingerprint Sensor
 
@@ -205,7 +318,7 @@ void listTemplates();                            // List all template IDs
 | **Model** | AS608 Optical Fingerprint Sensor |
 | **Interface** | UART (TTL) |
 | **Baud Rate** | 57600 (default) |
-| **Voltage** | 3.3V |
+| **Voltage** | 3.3V (not 5V!) |
 | **Template Capacity** | 162 templates |
 | **Library** | Adafruit Fingerprint Sensor Library |
 
@@ -213,10 +326,36 @@ void listTemplates();                            // List all template IDs
 
 ## Tier 4: Firebase Cloud Services
 
+```mermaid
+graph TD
+    subgraph Firebase["Firebase Platform"]
+        A["**Auth**
+        *Email/Password*"]
+        B["**RTDB**
+        *JSON NoSQL*"]
+        C["**Admin SDK**
+        *Service Account*"]
+    end
+
+    subgraph Data["Database Nodes"]
+        D["users/{uid}"]
+        E["services/{id}"]
+        F["appointments/{id}"]
+        G["kiosk_commands/{id}"]
+        H["kiosk_status/{id}"]
+    end
+
+    B --> D & E & F & G & H
+
+    style A fill:#e8f5e9,stroke:#2e7d32
+    style B fill:#e8f5e9,stroke:#2e7d32
+    style C fill:#e8f5e9,stroke:#2e7d32
+```
+
 ### 4.1 Firebase Authentication
 
 | Property | Details |
-|----------|---------|
+|----------|--------- |
 | **Method** | Email / Password |
 | **Users** | Residents (role: "resident"), Admins (role: "admin") |
 | **Session** | Firebase Auth JWT (managed by Firebase SDK) |
@@ -225,7 +364,7 @@ void listTemplates();                            // List all template IDs
 ### 4.2 Firebase Realtime Database (RTDB)
 
 | Property | Details |
-|----------|---------|
+|----------|--------- |
 | **Format** | JSON NoSQL |
 | **Regions** | Real-time sync globally |
 | **Security** | Firebase Security Rules (JSON-based) |
@@ -248,7 +387,7 @@ void listTemplates();                            // List all template IDs
 | From | To | Protocol | Data |
 |------|-----|----------|------|
 | Web App | Firebase Auth | HTTPS | Email, password |
-| Web App | Firebase RTDB | HTTPS/WebSocket | CRUD operations, listeners |
+| Web App | Firebase RTDB | HTTPS / WebSocket | CRUD operations, listeners |
 | RPi4 | Firebase RTDB | HTTPS REST | Read commands, write results |
 | RPi4 | ESP32 | Serial (115200 baud) | Text commands |
 | ESP32 | AS608 | UART (57600 baud) | Binary sensor commands |
@@ -258,50 +397,47 @@ void listTemplates();                            // List all template IDs
 
 ## Component Responsibility Diagram
 
-```
-+--------------------------------------------------+
-|                 WEB APPLICATION                   |
-|  Next.js + React + TypeScript + Tailwind CSS      |
-|  ------------------------------------------------|
-|  - User authentication (Firebase Auth)           |
-|  - Appointment booking interface                   |
-|  - Admin dashboard                                 |
-|  - Real-time queue display                         |
-|  - Profile management                              |
-+--------------------------------------------------+
-                        |
-                        v
-+--------------------------------------------------+
-|             FIREBASE CLOUD PLATFORM               |
-|  Authentication + Realtime Database              |
-|  ------------------------------------------------|
-|  - User account management                       |
-|  - Real-time data sync                             |
-|  - Secure access control (security rules)          |
-|  - Command queue (kiosk_commands)                  |
-+--------------------------------------------------+
-                        |
-                        v
-+--------------------------------------------------+
-|              RASPBERRY PI 4 KIOSK                 |
-|  Python + customtkinter + firebase-admin           |
-|  ------------------------------------------------|
-|  - Touchscreen GUI                                 |
-|  - Poll RTDB for commands                          |
-|  - Manage fingerprint operations                   |
-|  - Display results and queue info                  |
-|  - Admin panel (PIN-protected)                     |
-+--------------------------------------------------+
-                        |
-                        v
-+--------------------------------------------------+
-|              ESP32 + AS608 SENSOR                 |
-|  Arduino C++ + Adafruit Fingerprint Library        |
-|  ------------------------------------------------|
-|  - Fingerprint scanning                            |
-|  - Template enrollment                             |
-|  - 1:N matching                                    |
-|  - Template storage (162 capacity)                 |
-|  - UART command response                             |
-+--------------------------------------------------+
+```mermaid
+graph BT
+    subgraph Web["WEB APPLICATION"]
+        W["Next.js + React + TypeScript + Tailwind CSS
+        - Authentication
+        - Appointment Booking
+        - Admin Dashboard
+        - Queue Display
+        - Profile Management"]
+    end
+
+    subgraph Firebase["FIREBASE CLOUD PLATFORM"]
+        F["Authentication + Realtime Database
+        - User Account Management
+        - Real-time Data Sync
+        - Security Rules
+        - Command Queue"]
+    end
+
+    subgraph Kiosk["RASPBERRY PI 4 KIOSK"]
+        K["Python + customtkinter + firebase-admin
+        - Touchscreen GUI
+        - RTDB Command Polling
+        - Fingerprint Operations
+        - PIN-protected Admin Panel"]
+    end
+
+    subgraph HW["ESP32 + AS608 SENSOR"]
+        H["Arduino C++ + Adafruit Fingerprint Library
+        - Fingerprint Scanning
+        - Template Enrollment
+        - 1:N Matching
+        - Template Storage (162 capacity)"]
+    end
+
+    W --> F
+    K --> F
+    K --> H
+
+    style Web fill:#e3f2fd,stroke:#1565c0
+    style Firebase fill:#e8f5e9,stroke:#2e7d32
+    style Kiosk fill:#fff3e0,stroke:#e65100
+    style HW fill:#f3e5f5,stroke:#7b1fa2
 ```

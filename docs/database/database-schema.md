@@ -12,6 +12,85 @@ This system uses **Firebase Realtime Database (RTDB)** as its primary data store
 
 ---
 
+## Database Entity Diagram
+
+```mermaid
+erDiagram
+    USERS["users/{uid}"] {
+        string first_name
+        string last_name
+        string email
+        string phone
+        string birth_date
+        string address
+        string role
+        string status
+        boolean fingerprint_enrolled
+        number fingerprint_template_id
+        string created_at
+        string updated_at
+    }
+
+    SERVICES["services/{service_id}"] {
+        string name
+        string description
+        number duration_minutes
+        number slot_capacity_per_day
+        string department
+        boolean is_active
+        string created_at
+        string updated_at
+    }
+
+    APPOINTMENTS["appointments/{appointment_id}"] {
+        string resident_id
+        string service_id
+        string service_name
+        string appointment_date
+        string start_time
+        string end_time
+        string status
+        number queue_number
+        string notes
+        boolean verified_by_fingerprint
+        string created_at
+        string updated_at
+    }
+
+    SLOT_BOOKINGS["appointments/slot_bookings/{slot_key}"] {
+        string resident_id
+        string booked_at
+    }
+
+    KIOSK_COMMANDS["kiosk_commands/{command_id}"] {
+        string type
+        string target_uid
+        number template_id
+        string status
+        string created_by
+        string created_at
+        string completed_at
+        object result
+    }
+
+    KIOSK_STATUS["kiosk_status/{kiosk_id}"] {
+        boolean online
+        string last_heartbeat
+        boolean esp32_connected
+        number template_count
+        string firmware_version
+        number uptime_seconds
+    }
+
+    USERS ||--o{ APPOINTMENTS : "registers"
+    SERVICES ||--o{ APPOINTMENTS : "offers"
+    SERVICES ||--o{ SLOT_BOOKINGS : "locks slots"
+    USERS ||--o{ KIOSK_COMMANDS : "receives commands"
+    KIOSK_STATUS ||--o{ KIOSK_COMMANDS : "processes"
+```
+
+---
+
 ## Data Structure
 
 ### `users/{uid}`
@@ -92,7 +171,7 @@ Available Barangay services that residents can book.
 
 Individual appointment records.
 
-```json
+``` Leic```json
 {
   "appointments": {
     "appt_001": {
@@ -241,6 +320,33 @@ Real-time status and heartbeat for each physical kiosk.
 | `template_count` | number | Number of fingerprint templates stored |
 | `firmware_version` | string | ESP32 firmware version |
 | `uptime_seconds` | number | How long kiosk has been running |
+
+---
+
+## Data Flow Visualization
+
+```mermaid
+flowchart TB
+    subgraph ReadWrite["Read/Write Operations"]
+        WA["**Web App**
+*Firebase SDK*"] -->|Write| U["users/{uid}"]
+        WA -->|Read| S["services/{id}"]
+        WA -->|Write| A["appointments/{id}"]
+        WA -->|Write| KC["kiosk_commands/{id}"]
+
+        RPI["**RPi4 Kiosk**
+*Admin SDK*"] -->|Read| KC
+        RPI -->|Write| A
+        RPI -->|Write| KS["kiosk_status/{id}"]
+    end
+
+    subgraph Realtime["Real-time Listeners"]
+        direction LR
+        WA2["**Web App**"] -->|onValue| A2["appointments"]
+        KS2["kiosk_status"] -->|onValue| WA2
+        KC2["kiosk_commands"] -->|onValue| WA2
+    end
+```
 
 ---
 

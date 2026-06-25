@@ -10,7 +10,24 @@ For the **RPi4 to ESP32 serial protocol**, see [src/esp/uart_protocol.md](../../
 
 ## 1. Firebase Authentication API
 
-The Web application uses Firebase Authentication (Email/Password provider) for user identity.
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant CLIENT as **Web Client**
+    participant FB as **Firebase Auth**
+    participant RTDB as **Firebase RTDB**
+
+    CLIENT ->> FB: Register (email, password)
+    FB -->> CLIENT: Auth token (JWT)
+    CLIENT ->> RTDB: Write user profile (uid_xxx)
+    RTDB -->> CLIENT: Profile saved
+
+    CLIENT ->> FB: Sign In (email, password)
+    FB -->> CLIENT: Auth token (JWT)
+    CLIENT ->> RTDB: Read user profile
+    RTDB -->> CLIENT: Profile data
+```
 
 ### Sign Up
 Creates a new user account.
@@ -21,13 +38,12 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 await createUserWithEmailAndPassword(auth, email, password);
 ```
 
-**Parameters:**
-| Name | Type | Description |
-|------|------|-------------|
+| Parameter | Type | Description |
+|-----------|------|-------------|
 | `email` | string | Valid email address |
 | `password` | string | Min 6 characters |
 
-**User Profile (written to RTDB after creation):**
+**User Profile (written to RTDB):**
 ```json
 {
   "users/{uid}": {
@@ -69,22 +85,37 @@ import { sendPasswordResetEmail } from "firebase/auth";
 await sendPasswordResetEmail(auth, email);
 ```
 
-### Get Current User
-```javascript
-import { onAuthStateChanged } from "firebase/auth";
-
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    const uid = user.uid;
-  }
-});
-```
-
 ---
 
 ## 2. Firebase Realtime Database (RTDB) API
 
-All CRUD operations use the Firebase Realtime Database SDK.
+### Data Operations Flow
+
+```mermaid
+graph TD
+    subgraph Web["Web App"]
+        W["Firebase JS SDK"]
+    end
+
+    subgraph Kiosk["RPi4 Kiosk"]
+        R["Firebase Admin SDK"]
+    end
+
+    subgraph DB["Firebase RTDB"]
+        U["users/"]
+        S["services/"]
+        A["appointments/"]
+        KC["kiosk_commands/"]
+        KS["kiosk_status/"]
+    end
+
+    W -->|onValue / get / set| DB
+    R -->|get / set| DB
+
+    style Web fill:#e3f2fd,stroke:#1565c0
+    style Kiosk fill:#fff3e0,stroke:#e65100
+    style DB fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+```
 
 ### Users
 
@@ -114,30 +145,22 @@ const snapshot = await get(ref(db, "services"));
 const services = snapshot.val();
 ```
 
-#### Read Single Service
-```javascript
-const snapshot = await get(ref(db, `services/${serviceId}`));
-```
-
 ### Appointments
 
 #### Book an Appointment
 ```javascript
 import { push, set, ref, runTransaction } from "firebase/database";
 
-// 1. Atomically lock the slot
+// Atomically lock the slot
 const slotKey = `${serviceId}_${date}_${time}`;
 const slotRef = ref(db, `appointments/slot_bookings/${slotKey}`);
 
 await runTransaction(slotRef, (current) => {
   if (current) return;
-  return {
-    resident_id: uid,
-    booked_at: new Date().toISOString()
-  };
+  return { resident_id: uid, booked_at: new Date().toISOString() };
 });
 
-// 2. Create the appointment
+// Create the appointment
 const newAppointmentRef = push(ref(db, "appointments"));
 await set(newAppointmentRef, {
   resident_id: uid,
@@ -147,61 +170,13 @@ await set(newAppointmentRef, {
   start_time: "09:00",
   end_time: "09:30",
   status: "scheduled",
-  queue_number: 15,
-  verified_by_fingerprint: false,
-  created_at: new Date().toISOString()
+  queue_number: 15
 });
-```
-
-#### Read User's Appointments
-```javascript
-import { query, orderByChild, equalTo, onValue, ref } from "firebase/database";
-
-const appointmentsQuery = query(
-  ref(db, "appointments"),
-  orderByChild("resident_id"),
-  equalTo(uid)
-);
-
-onValue(appointmentsQuery, (snapshot) => {
-  const appointments = snapshot.val();
-  // Real-time updates
-});
-```
-
-#### Update Appointment Status
-```javascript
-import { update, ref } from "firebase/database";
-
-await update(ref(db, `appointments/${appointmentId}`), {
-  status: "cancelled",
-  updated_at: new Date().toISOString()
-});
-```
-
-### Kiosk Status
-
-#### Read Kiosk Status
-```javascript
-const snapshot = await get(ref(db, `kiosk_status/${kioskId}`));
-```
-
-#### Real-Time Kiosk Status Updates (on RPi4)
-```python
-from firebase_admin import db
-
-ref = db.reference(f'kiosk_status/{kiosk_id}')
-ref.set({
-    'online': True,
-    'last_heartbeat': datetime.utcnow().isoformat() + 'Z',
-    'esp32_connected': esp32_connected,
-    'template_count': template_count
-})
 ```
 
 ### Kiosk Commands
 
-#### Create Command (from Web App)
+#### Create Command (Web Admin -> RPi4)
 ```javascript
 import { push, set, ref } from "firebase/database";
 
@@ -215,7 +190,7 @@ await set(commandRef, {
 });
 ```
 
-#### Poll Commands (on RPi4)
+#### Poll Commands (RPi4)
 ```python
 from firebase_admin import db
 
@@ -230,7 +205,27 @@ for cmd_id, cmd in commands.items():
 
 ## 3. Serial Communication Protocol (RPi4 to ESP32)
 
-For complete protocol documentation, see [src/esp/uart_protocol.md](../../src/esp/uart_protocol.md).
+### Command Flow
+
+```mermaid
+sequenceDiagram
+    participant RPi as **RPi4**
+    participant ESP as **ESP32"
+    participant AS608 as **AS608 Sensor"
+
+    RPi ->> ESP: ENROLL:5
+    ESP ->> AS608: Capture scan (3x)
+    AS608 -->> ESP: Raw images
+    ESP ->> ESP: Convert & create model
+    ESP ->> AS608: storeModel(5)
+    AS608 -->> ESP: SUCCESS
+    ESP -->> RPi: OK:Enrollment complete
+
+    RPi ->> ESP: VERIFY
+    ESP ->> AS608: searchDatabase()
+    AS608 -->> ESP: Match found: ID=5, confidence=95
+    ESP -->> RPi: OK:Match found ID=5
+```
 
 ### Commands (RPi4 -> ESP32)
 
@@ -251,7 +246,8 @@ For complete protocol documentation, see [src/esp/uart_protocol.md](../../src/es
 | Error | `ERR:<error_code>:<message>` |
 | Data | `DATA:<key>=<value>` |
 
-**Examples:**
+### Serial Command/Response Examples
+
 ```
 # Enroll request
 -> ENROLL:5
