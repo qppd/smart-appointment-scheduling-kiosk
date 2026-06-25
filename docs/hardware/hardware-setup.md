@@ -11,9 +11,8 @@
 | 5 | MicroSD Card | 32GB, Class 10 | 1 | RPi4 storage |
 | 6 | USB-C Power Adapter | 5V/3A | 1 | RPi4 power |
 | 7 | Micro USB Cable | Data + power | 1 | ESP32 to RPi4 |
-| 8 | Jumper Wires | Female-to-female | 4+ | ESP32 to AS608 |
-| 9 | Raspberry Pi Case | With touchscreen mount | 1 | Optional but recommended |
-| 10 | Enclosure / 3D Printed Case | Custom kiosk housing | 1 | Optional |
+| 8 | Raspberry Pi Case | With touchscreen mount | 1 | Optional but recommended |
+| 9 | Enclosure / 3D Printed Case | Custom kiosk housing | 1 | Optional |
 
 ---
 
