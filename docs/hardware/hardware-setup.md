@@ -7,7 +7,7 @@
 | 1 | Raspberry Pi 4 Model B | 4GB RAM, 64-bit | 1 | Main kiosk computer |
 | 2 | ESP32 Development Board | ESP32-D0WDQ6, 30-pin | 1 | Fingerprint controller |
 | 3 | AS608 Fingerprint Sensor | Optical, UART | 1 | Biometric scanner |
-| 4 | Touchscreen LCD | 7-inch, 800x480, capacitive | 1 | User interface |
+| 4 | Touchscreen LCD | 10-inch, capacitive | 1 | User interface |
 | 5 | MicroSD Card | 32GB, Class 10 | 1 | RPi4 storage |
 | 6 | USB-C Power Adapter | 5V/3A | 1 | RPi4 power |
 | 7 | Micro USB Cable | Data + power | 1 | ESP32 to RPi4 |
@@ -86,7 +86,8 @@ graph LR
     end
 
     P1 -.->|Red| Q1
-    P2 -.->| BuildingBlack| Q2
+    P2 -.->| Building
+Black| Q2
     P3 -.->|White| Q3
     P4 -.->|Green| Q4
 
