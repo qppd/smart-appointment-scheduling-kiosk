@@ -37,6 +37,10 @@ export async function POST(request: NextRequest) {
     const otp = generateOtp();
     const sessionId = createOtpSession(normalizedPhone, otp);
 
+    console.log('🔑 SEMAPHORE_API_KEY loaded:', SEMAPHORE_API_KEY ? 'yes (hidden)' : 'MISSING');
+    console.log('📱 Normalized phone:', normalizedPhone);
+    console.log('🏷️ Sender name:', SENDER_NAME);
+
     const message = `Your Barangay Dolores verification code is: ${otp}. This code expires in 5 minutes.`;
 
     const body = new URLSearchParams();
@@ -45,7 +49,9 @@ export async function POST(request: NextRequest) {
     body.append('message', message);
     body.append('sendername', SENDER_NAME);
 
-    const response = await fetch('https://api.semaphore.co/api/v4/messages', {
+    console.log('📤 Sending request to Semaphore with body:', body.toString());
+
+    const response = await fetch('https://semaphore.co/api/v4/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
@@ -59,16 +65,15 @@ export async function POST(request: NextRequest) {
       data = await response.text();
     }
 
+    console.log('📥 Semaphore raw response:', { status: response.status, data });
+
     if (!response.ok) {
-      console.error('Semaphore HTTP error:', response.status, data);
       return NextResponse.json({ error: 'Failed to send OTP', details: data, sessionId }, { status: 500 });
     }
 
     const firstResult = Array.isArray(data) ? data[0] : data;
-    console.log('Semaphore response:', firstResult);
 
     if (firstResult?.status === 'Failed' || firstResult?.error) {
-      console.error('Semaphore returned error:', firstResult);
       return NextResponse.json(
         { error: firstResult?.error || firstResult?.message || 'Failed to send OTP', details: firstResult, sessionId },
         { status: 500 }

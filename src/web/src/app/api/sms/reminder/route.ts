@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     body.append('message', message);
     body.append('sendername', SENDER_NAME);
 
-    const response = await fetch('https://api.semaphore.co/api/v4/messages', {
+    const response = await fetch('https://semaphore.co/api/v4/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
