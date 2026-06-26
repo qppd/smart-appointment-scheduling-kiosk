@@ -29,22 +29,43 @@ export async function POST(request: NextRequest) {
 
     const normalizedPhone = normalizePhoneNumber(phone);
 
-    const url = new URL('https://api.semaphore.co/api/v4/messages');
-    url.searchParams.set('apikey', SEMAPHORE_API_KEY);
-    url.searchParams.set('number', normalizedPhone);
-    url.searchParams.set('message', message);
-    url.searchParams.set('sendername', SENDER_NAME);
-    url.searchParams.set('from', SENDER_NAME);
+    const body = new URLSearchParams();
+    body.append('apikey', SEMAPHORE_API_KEY);
+    body.append('number', normalizedPhone);
+    body.append('message', message);
+    body.append('sendername', SENDER_NAME);
 
-    const response = await fetch(url.toString(), { method: 'POST' });
-    const data = await response.json();
+    const response = await fetch('https://api.semaphore.co/api/v4/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    let data;
+    if (contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      data = await response.text();
+    }
 
     if (!response.ok) {
       console.error('Semaphore error:', data);
       return NextResponse.json({ error: 'Failed to send SMS', details: data }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data });
+    const firstResult = Array.isArray(data) ? data[0] : data;
+    console.log('Semaphore send response:', firstResult);
+
+    if (firstResult?.status === 'Failed' || firstResult?.error) {
+      console.error('Semaphore returned error:', firstResult);
+      return NextResponse.json(
+        { error: firstResult?.error || firstResult?.message || 'Failed to send SMS', details: firstResult },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: firstResult });
   } catch (err: any) {
     console.error('SMS send error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
