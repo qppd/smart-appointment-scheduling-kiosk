@@ -6,13 +6,13 @@ const SENDER_NAME = process.env.SEMAPHORE_SENDER_NAME || 'SEMAFOR';
 function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('09')) {
-    return '0' + digits; // 09XXXXXXXXX -> 09XXXXXXXXX
+    return digits;
   }
   if (digits.length === 12 && digits.startsWith('63')) {
-    return '0' + digits.slice(2); // 63XXXXXXXXX -> 09XXXXXXXXX
+    return '0' + digits.slice(2);
   }
   if (digits.length === 13 && digits.startsWith('639')) {
-    return '0' + digits.slice(2); // 639XXXXXXXXXX -> 09XXXXXXXXX
+    return '0' + digits.slice(3);
   }
   return phone;
 }
