@@ -1,14 +1,16 @@
 /**
- * OTP Session Store with automatic fallback.
+ * OTP Session Store — in-memory only.
  *
- * **Firebase RTDB** — used on Vercel (persistent across cold starts).
- * **In-memory Map** — fallback for local dev when Firebase isn't configured.
+ * OTP sessions are ephemeral (5-min TTL). In-memory is appropriate:
+ * - send-otp returns sessionId to the client
+ * - verify-otp receives sessionId back from the client
+ * - If a cold start or different instance receives verify-otp,
+ *   the user simply requests a new OTP (rare in practice since
+ *   registration flow is seconds-long).
  *
- * The Firebase SDK is lazy-loaded so it never initializes during build.
+ * No Firebase dependency — eliminates Vercel serverless issues.
  */
 import 'server-only';
-import { ref, get, set, update } from 'firebase/database';
-import type { Database } from 'firebase/database';
 
 interface OtpSession {
   phone: string;
@@ -17,20 +19,18 @@ interface OtpSession {
   maxAttempts: number;
   expiresAt: number;
   verified: boolean;
-  createdAt: number;
 }
 
 const MAX_ATTEMPTS = 3;
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-// ---- In-memory fallback store (local dev) ----
-const memoryStore = new Map<string, OtpSession>();
+const store = new Map<string, OtpSession>();
 
-function cleanupMemory(): void {
+function cleanup(): void {
   const now = Date.now();
-  memoryStore.forEach((session, id) => {
+  store.forEach((session, id) => {
     if (now > session.expiresAt) {
-      memoryStore.delete(id);
+      store.delete(id);
     }
   });
 }
@@ -39,30 +39,29 @@ function generateId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function createMemorySession(phone: string, otp: string): string {
-  cleanupMemory();
+export function createOtpSession(phone: string, otp: string): string {
+  cleanup();
   const id = generateId();
-  memoryStore.set(id, {
+  store.set(id, {
     phone,
     otp,
     attempts: 0,
     maxAttempts: MAX_ATTEMPTS,
     expiresAt: Date.now() + TTL_MS,
     verified: false,
-    createdAt: Date.now(),
   });
   return id;
 }
 
-function verifyMemoryOtp(id: string, code: string): { success: boolean; message: string } {
-  cleanupMemory();
-  const session = memoryStore.get(id);
+export function verifyOtp(id: string, code: string): { success: boolean; message: string } {
+  cleanup();
+  const session = store.get(id);
   if (!session) {
     return { success: false, message: 'Session expired or invalid. Please request a new OTP.' };
   }
 
   if (Date.now() > session.expiresAt) {
-    memoryStore.delete(id);
+    store.delete(id);
     return { success: false, message: 'OTP has expired. Please request a new one.' };
   }
 
@@ -71,7 +70,7 @@ function verifyMemoryOtp(id: string, code: string): { success: boolean; message:
   }
 
   if (session.attempts >= session.maxAttempts) {
-    memoryStore.delete(id);
+    store.delete(id);
     return { success: false, message: 'Too many failed attempts. Please request a new OTP.' };
   }
 
@@ -83,105 +82,16 @@ function verifyMemoryOtp(id: string, code: string): { success: boolean; message:
   }
 
   session.verified = true;
-  memoryStore.set(id, session);
+  store.set(id, session);
   return { success: true, message: 'OTP verified successfully.' };
 }
 
-function getMemoryPhone(id: string): string | null {
-  const session = memoryStore.get(id);
-  return session ? session.phone : null;
-}
-
-function isMemoryVerified(id: string): boolean {
-  const session = memoryStore.get(id);
+export function isVerified(id: string): boolean {
+  const session = store.get(id);
   return session ? session.verified : false;
 }
 
-// ---- Firebase-backed store (production/Vercel) ----
-let _db: Database | null = null;
-let _useFirebase: boolean | null = null;
-
-async function getDbOrNull(): Promise<Database | null> {
-  if (_useFirebase !== null) return _useFirebase ? _db : null;
-  try {
-    const { db } = await import('@/lib/firebase');
-    _db = db;
-    _useFirebase = true;
-    return db;
-  } catch {
-    _useFirebase = false;
-    return null;
-  }
-}
-
-// ---- Unified API ----
-
-export async function createOtpSession(phone: string, otp: string): Promise<string> {
-  const database = await getDbOrNull();
-  const id = generateId();
-
-  if (database) {
-    await set(ref(database, `otp_sessions/${id}`), {
-      phone,
-      otp,
-      attempts: 0,
-      maxAttempts: MAX_ATTEMPTS,
-      expiresAt: Date.now() + TTL_MS,
-      verified: false,
-      createdAt: Date.now(),
-    });
-  } else {
-    createMemorySession(phone, otp);
-  }
-  return id;
-}
-
-export async function verifyOtp(id: string, code: string): Promise<{ success: boolean; message: string }> {
-  const database = await getDbOrNull();
-
-  if (database) {
-    const snap = await get(ref(database, `otp_sessions/${id}`));
-    if (!snap.exists()) {
-      return { success: false, message: 'Session expired or invalid. Please request a new OTP.' };
-    }
-
-    const session = snap.val() as OtpSession;
-
-    if (Date.now() > session.expiresAt) {
-      await set(ref(database, `otp_sessions/${id}`), null);
-      return { success: false, message: 'OTP has expired. Please request a new one.' };
-    }
-
-    if (session.verified) {
-      return { success: false, message: 'This OTP has already been used.' };
-    }
-
-    const attempts = session.attempts + 1;
-
-    if (attempts >= session.maxAttempts) {
-      await set(ref(database, `otp_sessions/${id}`), null);
-      return { success: false, message: 'Too many failed attempts. Please request a new OTP.' };
-    }
-
-    await update(ref(database, `otp_sessions/${id}`), { attempts });
-
-    if (session.otp !== code) {
-      const remaining = session.maxAttempts - attempts;
-      return { success: false, message: `Invalid OTP. ${remaining} attempts remaining.` };
-    }
-
-    await update(ref(database, `otp_sessions/${id}`), { verified: true });
-    return { success: true, message: 'OTP verified successfully.' };
-  }
-
-  // Fallback to in-memory
-  return verifyMemoryOtp(id, code);
-}
-
-export function isVerified(id: string): boolean {
-  return isMemoryVerified(id);
-}
-
 export function getSessionPhone(id: string): string | null {
-  return getMemoryPhone(id);
+  const session = store.get(id);
+  return session ? session.phone : null;
 }

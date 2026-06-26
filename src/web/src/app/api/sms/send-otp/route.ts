@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const normalizedPhone = normalizePhilippinePhone(phone);
     const otp = generateOtp();
-    const sessionId = await createOtpSession(normalizedPhone, otp);
+    const sessionId = createOtpSession(normalizedPhone, otp);
 
     try {
       await sendOtp(normalizedPhone, otp);
