@@ -44,7 +44,6 @@ export async function POST(request: NextRequest) {
     url.searchParams.set('number', normalizedPhone);
     url.searchParams.set('message', message);
     url.searchParams.set('sendername', SENDER_NAME);
-    url.searchParams.set('from', SENDER_NAME);
 
     const response = await fetch(url.toString(), { method: 'POST' });
     const data = await response.json();
