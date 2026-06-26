@@ -67,14 +67,37 @@ export default function Register() {
     try {
       const result = await verifyOTP(sessionId, otp.trim());
       if (!result.success) { setOtpError(result.message); setOtpLoading(false); return; }
-      // OTP verified - create account
+    } catch {
+      setOtpError('OTP verification network error. Please try again.');
+      setOtpLoading(false);
+      return;
+    }
+    // OTP verified — create account
+    try {
       await signUp(form.email, form.password, {
         first_name: form.first_name, last_name: form.last_name, middle_name: form.middle_name,
         email: form.email, phone: form.phone, birth_date: form.birth_date, address: form.address,
       });
       router.replace('/booking');
-    } catch {
-      setOtpError('OTP verification failed. Please try again.');
+    } catch (err: unknown) {
+      const fbMessage = err instanceof Error ? err.message : '';
+      if (fbMessage.includes('auth/email-already-in-use')) {
+        setOtpError('This email is already registered. Please sign in instead.');
+      } else if (fbMessage.includes('auth/invalid-email')) {
+        setOtpError('Invalid email address.');
+      } else if (fbMessage.includes('auth/weak-password')) {
+        setOtpError('Password is too weak. Use at least 6 characters.');
+      } else if (fbMessage.includes('auth/network-request-failed')) {
+        setOtpError('Network error during account creation. Please check your connection.');
+      } else if (fbMessage.includes('auth/too-many-requests')) {
+        setOtpError('Too many attempts. Please wait a moment before trying again.');
+      } else if (fbMessage.includes('auth/api-key-not-valid')) {
+        setOtpError('Account creation is temporarily unavailable. Please contact support.');
+      } else if (fbMessage.includes('auth/operation-not-allowed')) {
+        setOtpError('Email/Password sign-up is not enabled in Firebase Console. Please contact support.');
+      } else {
+        setOtpError('Failed to create account. Please try again.');
+      }
     } finally { setOtpLoading(false); }
   };
 

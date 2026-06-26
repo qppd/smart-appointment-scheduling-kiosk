@@ -80,7 +80,7 @@ export async function verifyOTP(sessionId: string, otp: string): Promise<SmsVeri
   const data = await postApi<ApiResponse>('/api/sms/verify-otp', { sessionId, otp });
   return {
     success: data.success,
-    message: data.error || data.message || (data.success ? 'OTP verified.' : 'OTP verification failed'),
+    message: data.message || (data.success ? 'OTP verified.' : 'OTP verification failed'),
   };
 }
 
