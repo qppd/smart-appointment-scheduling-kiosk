@@ -47,13 +47,13 @@ function emit(event: LogEvent): void {
   }
   const hooks = globalThis.__semaphoreLogHooks;
   if (hooks) {
-    for (const hook of hooks) {
+    hooks.forEach((hook) => {
       try {
         hook(safe);
       } catch {
         // never let a hook break a send
       }
-    }
+    });
   }
 }
 
@@ -146,7 +146,6 @@ async function semaphoreRequest<T>(
   },
   caller: { signal?: AbortSignal },
 ): Promise<T> {
-  const start = Date.now();
   const cfg = getSemaphoreConfig();
   const url = `${cfg.baseUrl}${params.path}`;
 
@@ -205,8 +204,6 @@ async function semaphoreRequest<T>(
 
     if (response.ok) {
       const provider = params.expectedShape === 'array' && Array.isArray(parsed) ? parsed[0] : parsed;
-      const resultForFirst = params.firstResult(parsed);
-      void resultForFirst;
       // Provider-level failure (HTTP 200 with status: Failed) — rare but possible.
       if (params.isRetryable && params.isRetryable(provider)) {
         lastError = 'provider_failure';
