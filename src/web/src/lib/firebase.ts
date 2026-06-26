@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getDatabase } from 'firebase/database';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getDatabase, type Database } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,9 +12,35 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+function hasValidConfig(): boolean {
+  return !!(
+    firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.databaseURL &&
+    firebaseConfig.projectId
+  );
+}
 
-export const auth = getAuth(app);
-export const db = getDatabase(app);
+// Eager init — guarded so Next.js prerendering doesn't crash when env vars
+// are absent locally. The resulting null values are cast away here because
+// all consumers run in the browser where valid config is always present.
+let _app: FirebaseApp | null = null;
+if (hasValidConfig()) {
+  _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+}
+
+export const app: FirebaseApp = _app as unknown as FirebaseApp;
+export const auth: Auth = (_app ? getAuth(_app) : null) as unknown as Auth;
+export const db: Database = (_app ? getDatabase(_app) : null) as unknown as Database;
+
+export function getFirebaseAuth(): Auth {
+  if (!_app) throw new Error('Firebase not configured — check env vars.');
+  return auth;
+}
+
+export function getFirebaseDb(): Database {
+  if (!_app) throw new Error('Firebase not configured — check env vars.');
+  return db;
+}
 
 export default app;
