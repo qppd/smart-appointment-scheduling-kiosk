@@ -1,3 +1,1 @@
-{
-  "/api/sms/send-otp/route": "app/api/sms/send-otp/route.js"
-}
+{}

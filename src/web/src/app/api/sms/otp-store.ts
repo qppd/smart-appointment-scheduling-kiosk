@@ -35,10 +35,13 @@ function cleanupMemory(): void {
   });
 }
 
+function generateId(): string {
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function createMemorySession(phone: string, otp: string): string {
   cleanupMemory();
-  const crypto = require('node:crypto') as typeof import('node:crypto');
-  const id = crypto.randomUUID();
+  const id = generateId();
   memoryStore.set(id, {
     phone,
     otp,
@@ -115,8 +118,7 @@ async function getDbOrNull(): Promise<Database | null> {
 
 export async function createOtpSession(phone: string, otp: string): Promise<string> {
   const database = await getDbOrNull();
-  const crypto = await import('node:crypto');
-  const id = crypto.randomUUID();
+  const id = generateId();
 
   if (database) {
     await set(ref(database, `otp_sessions/${id}`), {

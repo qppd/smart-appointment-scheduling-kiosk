@@ -42,3 +42,6 @@ firebase-adminsdk-*.json
 sask-dc973-firebase-adminsdk-fbsvc-63fed4c5b4.json
 # SQLite test db artifacts
 file\:\:memory\:
+
+# Next.js build output
+.next/
