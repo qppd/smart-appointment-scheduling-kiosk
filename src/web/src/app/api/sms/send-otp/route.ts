@@ -48,10 +48,11 @@ export async function POST(request: NextRequest) {
     body.append('number', normalizedPhone);
     body.append('message', message);
     body.append('sendername', SENDER_NAME);
+    body.append('code', otp);
 
-    console.log('📤 Sending request to Semaphore with body:', body.toString());
+    console.log('📤 Sending request to Semaphore OTP endpoint with body:', body.toString());
 
-    const response = await fetch('https://semaphore.co/api/v4/messages', {
+    const response = await fetch('https://semaphore.co/api/v4/otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
