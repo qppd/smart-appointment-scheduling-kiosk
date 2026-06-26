@@ -1,18 +1,18 @@
 /**
- * OTP Session Store — stateless HMAC-signed tokens.
- *
- * The sessionId IS the OTP check: it's an HMAC-signed payload
+ * OTP Session Store — stateless HMAC-signed tokens using Node.js crypto.
+ * 
+ * The sessionId IS the OTP check: it's an HMAC-SHA256 signed payload
  * containing { phone, otp_hash, expiresAt }.
  * verify-otp decodes and validates — no server-side storage needed.
  * Works on ANY Vercel instance, survives cold starts.
  */
 import 'server-only';
+import crypto from 'node:crypto';
 
 const MAX_ATTEMPTS = 3;
 const TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function getSecret(): string {
-  // Use SEMAPHORE_API_KEY as HMAC secret (already set on Vercel)
   const secret = process.env.SEMAPHORE_API_KEY;
   if (!secret) {
     throw new Error('SEMAPHORE_API_KEY is required for OTP signing');
@@ -20,20 +20,8 @@ function getSecret(): string {
   return secret;
 }
 
-async function hmacSign(data: string): Promise<string> {
-  const key = getSecret();
-  const encoder = new TextEncoder();
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(key),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(data));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+function hmacSign(data: string): string {
+  return crypto.createHmac('sha256', getSecret()).update(data).digest('hex');
 }
 
 function base64UrlEncode(data: string): string {
@@ -44,30 +32,23 @@ function base64UrlDecode(data: string): string {
   return Buffer.from(data, 'base64url').toString('utf-8');
 }
 
-function generateOtpValue(): string {
+export function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-export interface OtpSessionPayload {
-  phone: string;
-  otp: string;
-  expiresAt: number;
-  attempts: number;
 }
 
 /**
  * Create an OTP session. Returns a signed token as the sessionId.
  * The OTP value is embedded inside — no server storage needed.
  */
-export async function createOtpSession(phone: string, otp: string): Promise<string> {
-  const payload: OtpSessionPayload = {
+export function createOtpSession(phone: string, otp: string): string {
+  const payload = JSON.stringify({
     phone,
     otp,
     expiresAt: Date.now() + TTL_MS,
     attempts: 0,
-  };
-  const encoded = base64UrlEncode(JSON.stringify(payload));
-  const sig = await hmacSign(encoded);
+  });
+  const encoded = base64UrlEncode(payload);
+  const sig = hmacSign(encoded);
   return `${encoded}.${sig}`;
 }
 
@@ -75,7 +56,7 @@ export async function createOtpSession(phone: string, otp: string): Promise<stri
  * Verify an OTP against a signed sessionId (HMAC token).
  * Validates signature, expiry, OTP match, and attempt count.
  */
-export async function verifyOtp(token: string, code: string): Promise<{ success: boolean; message: string }> {
+export function verifyOtp(token: string, code: string): { success: boolean; message: string } {
   const parts = token.split('.');
   if (parts.length !== 2) {
     return { success: false, message: 'Invalid session format.' };
@@ -84,13 +65,13 @@ export async function verifyOtp(token: string, code: string): Promise<{ success:
   const [encoded, sig] = parts;
 
   // Verify HMAC signature
-  const expectedSig = await hmacSign(encoded);
+  const expectedSig = hmacSign(encoded);
   if (sig !== expectedSig) {
     return { success: false, message: 'Invalid session. Please request a new OTP.' };
   }
 
   // Decode payload
-  let payload: OtpSessionPayload;
+  let payload: { phone: string; otp: string; expiresAt: number; attempts: number };
   try {
     payload = JSON.parse(base64UrlDecode(encoded));
   } catch {
@@ -102,21 +83,15 @@ export async function verifyOtp(token: string, code: string): Promise<{ success:
     return { success: false, message: 'OTP has expired. Please request a new one.' };
   }
 
-  // Check attempts (tracked client-side via token re-issuance)
-  // We re-sign with incremented attempts on each failed try
+  // Check attempts
   if (payload.attempts >= MAX_ATTEMPTS) {
     return { success: false, message: 'Too many failed attempts. Please request a new OTP.' };
   }
 
   if (payload.otp !== code) {
-    // Re-issue token with incremented attempts so the client can retry
     const remaining = MAX_ATTEMPTS - payload.attempts - 1;
     return { success: false, message: `Invalid OTP. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.` };
   }
 
   return { success: true, message: 'OTP verified successfully.' };
-}
-
-export function generateOtp(): string {
-  return generateOtpValue();
 }
