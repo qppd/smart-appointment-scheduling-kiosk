@@ -2,14 +2,10 @@ import { NextRequest } from 'next/server';
 import { sendOtp, normalizePhilippinePhone } from '@/lib/semaphore';
 import { SemaphoreError } from '@/lib/semaphore/types';
 import { jsonError, jsonOk } from '@/lib/semaphore/route-helpers';
-import { createOtpSession } from '../otp-store';
+import { createOtpSession, generateOtp } from '../otp-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
 
 /**
  * POST /api/sms/send-otp
