@@ -12,7 +12,7 @@ function normalizePhoneNumber(phone: string): string {
     return '0' + digits.slice(2);
   }
   if (digits.length === 13 && digits.startsWith('639')) {
-    return '0' + digits.slice(3� tokens slice(3);
+    return '0' + digits.slice(3);
   }
   return phone;
 }
