@@ -1,17 +1,17 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/sms/booking-confirmation/route": "app/api/sms/booking-confirmation/route.js",
-  "/api/sms/reminder/route": "app/api/sms/reminder/route.js",
-  "/api/sms/send-otp/route": "app/api/sms/send-otp/route.js",
-  "/api/sms/send/route": "app/api/sms/send/route.js",
   "/api/sms/verify-otp/route": "app/api/sms/verify-otp/route.js",
   "/booking/page": "app/booking/page.js",
   "/dolores-taytay-admin/page": "app/dolores-taytay-admin/page.js",
   "/kiosk/page": "app/kiosk/page.js",
   "/login/page": "app/login/page.js",
   "/my-appointments/page": "app/my-appointments/page.js",
-  "/profile/page": "app/profile/page.js",
   "/page": "app/page.js",
   "/register/page": "app/register/page.js",
-  "/settings/page": "app/settings/page.js"
+  "/profile/page": "app/profile/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/api/sms/send-otp/route": "app/api/sms/send-otp/route.js",
+  "/api/sms/booking-confirmation/route": "app/api/sms/booking-confirmation/route.js",
+  "/api/sms/send/route": "app/api/sms/send/route.js",
+  "/api/sms/reminder/route": "app/api/sms/reminder/route.js"
 }
