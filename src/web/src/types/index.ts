@@ -47,7 +47,39 @@ export interface Appointment {
   enrollment_otp?: string;
   enrollment_otp_expires_at?: string;
   enrollment_otp_consumed_at?: string;
+  sms_reminder_sent?: boolean;
+  sms_reminder_sent_at?: string;
+  cancelled_at?: string;
+  cancel_reason?: string;
   created_at: string;
+}
+
+export interface MessageLog {
+  id: string;
+  appointment_id?: string;
+  phone: string;
+  message: string;
+  status: 'pending' | 'sent' | 'failed';
+  type: 'otp' | 'confirmation' | 'reminder' | 'manual';
+  sent_at?: string;
+  error_message?: string;
+}
+
+export interface OtpVerification {
+  session_id: string;
+  phone: string;
+  otp: string;
+  verified: boolean;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface SmsReminder {
+  id: string;
+  appointment_id: string;
+  phone: string;
+  status: 'scheduled' | 'sent' | 'skipped';
+  reminded_at?: string;
 }
 
 export interface KioskCommand {

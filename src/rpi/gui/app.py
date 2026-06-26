@@ -46,6 +46,15 @@ SERIAL_PORT = os.environ.get("SERIAL_PORT", "/dev/ttyUSB0")
 SERIAL_BAUD = int(os.environ.get("SERIAL_BAUD", "115200"))
 
 
+import re
+
+# (inside _fetch_and_update or as module-level helper)
+def _sanitize_slot_key(key: str) -> str:
+    return re.sub(r'[.#$\[\]/]', '_', key)
+
+def _create_slot_key(service_id: str, date: str, start_time: str, end_time: str) -> str:
+    return _sanitize_slot_key(f"{service_id}_{date}_{start_time}_{end_time}")
+
 class FirebaseService:
     """Thread-safe wrapper around Firebase Admin SDK Realtime Database."""
 
@@ -59,6 +68,10 @@ class FirebaseService:
     def update_child(self, path: str, data: dict):
         with self._db_lock:
             db.reference(path).update(data)
+
+    def set_child(self, path: str, data):
+        with self._db_lock:
+            db.reference(path).set(data)
 
 
 class KioskApp(ctk.CTk):
@@ -350,7 +363,7 @@ class KioskApp(ctk.CTk):
                     continue
                 if a.get("resident_id") == resident_id and \
                         a.get("appointment_date") == today and \
-                        a.get("status") in ("scheduled", "checked_in"):
+                        a.get("status") == "scheduled":
                     appointment = a
                     appointment["id"] = aid
                     break
@@ -511,6 +524,42 @@ class KioskApp(ctk.CTk):
             except Exception:
                 traceback.print_exc()
                 all_appts = {}
+
+            # Auto-cancel overdue scheduled appointments.
+            now_dt = datetime.now()
+            for aid, a in list(all_appts.items()):
+                if not isinstance(a, dict):
+                    continue
+                if a.get("status") != "scheduled":
+                    continue
+                appt_date = a.get("appointment_date", "")
+                end_time_str = a.get("end_time", "")
+                if not appt_date or not end_time_str:
+                    continue
+                try:
+                    dt_str = f"{appt_date} {end_time_str}"
+                    end_dt = datetime.strptime(dt_str, "%Y-%m-%d %I:%M %p")
+                    if now_dt > end_dt:
+                        self.fb_service.update_child(
+                            f"appointments/{aid}",
+                            {
+                                "status": "cancelled",
+                                "cancelled_at": int(time.time() * 1000),
+                                "cancel_reason": "auto_cancelled",
+                            })
+                        # Release the slot booking
+                        slot_key = _create_slot_key(
+                            a.get("service_id", ""),
+                            appt_date,
+                            a.get("start_time", ""),
+                            end_time_str,
+                        )
+                        self.fb_service.set_child(
+                            f"appointments/slot_bookings/{slot_key}", None)
+                        print(f"[AUTO-CANCEL] Cancelled overdue appointment {aid}")
+                except (ValueError, Exception) as e:
+                    # Malformed date/time — skip
+                    pass
 
             todays = []
             for aid, a in all_appts.items():

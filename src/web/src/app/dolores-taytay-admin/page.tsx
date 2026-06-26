@@ -17,9 +17,10 @@ import {
   Briefcase, ListOrdered, Users as UsersIcon, BarChart3, Search,
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, X, ChevronDown,
   UserCircle, Settings as SettingsIcon, LogOut, Shield, Loader2, AlertOctagon,
-  Calendar, Fingerprint, CheckCircle, ArrowUp, ArrowDown,
+  Calendar, Fingerprint, CheckCircle, ArrowUp, ArrowDown, Mail,
 } from 'lucide-react';
 import { to12HourFormat } from '@/lib/utils';
+import { sendReminderSMS } from '@/lib/sms';
 
 const ADMIN_EMAIL = 'quezon.province.pd@gmail.com';
 
@@ -718,6 +719,46 @@ Appointment System</p>
                         {a.status}
                       </span>
                     );
+                  },
+                },
+                {
+                  key: 'sms_reminder_sent',
+                  label: 'SMS',
+                  render: (a: Appointment) => {
+                    if (a.status !== 'scheduled') return <span className="text-gray-400">—</span>;
+                    return a.sms_reminder_sent
+                      ? <span className="text-green-600 text-xs font-medium">Sent</span>
+                      : <span className="text-yellow-600 text-xs font-medium">Pending</span>;
+                  },
+                },
+              ]}
+              actions={[
+                {
+                  label: 'Send SMS Reminder',
+                  icon: <Mail className="h-4 w-4 text-teal-600" />,
+                  onClick: async (a) => {
+                    const apt = a as Appointment;
+                    if (apt.status !== 'scheduled') {
+                      alert('Can only send reminders for scheduled appointments.');
+                      return;
+                    }
+                    try {
+                      const userData = await getUserData(apt.resident_id);
+                      if (!userData?.phone) {
+                        alert('No phone number on file for this resident.');
+                        return;
+                      }
+                      const result = await sendReminderSMS({
+                        phone: userData.phone,
+                        serviceName: apt.service_name,
+                        appointmentDate: apt.appointment_date,
+                        startTime: apt.start_time,
+                        endTime: apt.end_time,
+                      });
+                      alert(result.success ? 'Reminder SMS sent!' : result.message);
+                    } catch {
+                      alert('Failed to send SMS. Please try again.');
+                    }
                   },
                 },
               ]}

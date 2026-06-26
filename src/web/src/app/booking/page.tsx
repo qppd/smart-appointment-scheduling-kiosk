@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { MobileBackButton } from '@/components/MobileBackButton';
 import { subscribeServices, createAppointment, regenerateEnrollmentOTP } from '@/lib/rtdb';
 import { db } from '@/lib/firebase';
+import { sendBookingConfirmation } from '@/lib/sms';
 import type { Service } from '@/types';
 import { ArrowLeft, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
@@ -88,6 +89,20 @@ export default function Booking() {
       setAppointmentId(result.id);
       setEnrollmentOtp(result.otp);
       setStep('done');
+
+      // Fire-and-forget SMS booking confirmation
+      getUserData(user.uid).then((data) => {
+        if (data?.phone) {
+          sendBookingConfirmation({
+            phone: data.phone,
+            serviceName: selectedService.name,
+            appointmentDate: selectedDate,
+            startTime: start,
+            endTime: end,
+            enrollmentCode: result.otp,
+          }).catch(() => {});
+        }
+      }).catch(() => {});
     } catch (err: any) {
       console.error('Booking error:', err);
       const msg = err?.message || '';
