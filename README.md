@@ -1,59 +1,74 @@
 # Smart Appointment Scheduling Kiosk
 
-A complete appointment scheduling and biometric check-in system designed for Barangay (community-level government) service management in the Philippines. Residents book appointments online via a web application and check in at a physical kiosk using fingerprint biometrics.
-
----
-
-## Quick Overview
-
-**Architecture:** Web (Next.js + Firebase RTDB) → RPi4 (Python + customtkinter) → ESP32 (Fingerprint Sensor via Micro USB)
-
-```
-                    +------------------+       +------------------+       +------------------+
-                    |   Web Browser   |       |   RPi4 Kiosk     |       |   ESP32 + AS608  |
-                    |   (Next.js 14)  |       |   (Python GUI)   |       |   (Arduino C++)  |
-                    +--------+---------+       +--------+---------+       +------------------+
-                             |                         |
-                             |    HTTPS/REST/WSS       |    Serial (115200 baud)
-                             v                         v
-                    +--------+---------+       +--------+---------+
-                    |                                      |
-                    |   Firebase Cloud Platform             |
-                    |   - Authentication (Email/Password)    |
-                    |   - Realtime Database (RTDB)          |
-                    |                                      |
-                    +--------------------------------------+
-```
+A complete appointment scheduling and biometric check-in system designed for **Barangay (community-level government)** service management in the Philippines. Residents book appointments online, verify via SMS OTP, and check in at a physical kiosk using **AS608 fingerprint biometrics**.
 
 ---
 
 ## System Architecture
 
-The system consists of **4 architectural tiers**:
+**Architecture (4 tiers):** Next.js + Firebase → RPi4 (Python GUI) → ESP32 (UART) → AS608 Sensor
+
+### Summary Diagram (as-built)
+
+```
+  [Resident Browser]     [Admin Browser]          [Kiosk Touchscreen]
+        │                      │                        │
+        │   HTTPS/WSS         │   HTTPS/WSS            │  HTTPS REST
+        ▼                      ▼                        ▼
+   ┌──────────────────────────────────────────────────────┐
+   │                  FIREBASE PLATFORM                    │
+   │  ┌─────────────────┐     ┌────────────────────────┐  │
+   │  │   Auth           │     │   Realtime Database    │  │
+   │  │ (Email/Password) │     │   (RTDB - JSON NoSQL) │  │
+   │  └─────────────────┘     └──────┬─────────────────┘  │
+   │                                 │                    │
+   │  RTDB Nodes: users/{uid}, services/{id},             │
+   │  appointments/{id}, slot_bookings/{key},             │
+   │  kiosk_commands/{id}, kiosk_status/{id}              │
+   └──────────────────────┬───────────────────────────────┘
+                          │
+            ┌─────────────┴──────────────┐
+            ▼                            ▼
+   ┌─────────────────┐       ┌──────────────────────────┐
+   │  Vercel Edge    │       │  RPi4 Kiosk (Python)     │
+   │  Next.js 14     │       │  customtkinter GUI       │
+   │  9 pages        │       │  firebase-admin SDK      │
+   │  5 API routes   │       │  pyserial (115200 baud)  │
+   │  Semaphore SMS  │       │  3 background threads    │
+   └─────────────────┘       └──────────┬───────────────┘
+                                        │ Serial 115200
+                                        ▼
+                               ┌──────────────────┐
+                               │  ESP32 + AS608   │
+                               │  10 commands     │
+                               │  127 templates   │
+                               │  500ms monitor   │
+                               └──────────────────┘
+```
+
+### Tiers
 
 | Tier | Technology | Role |
 |------|-----------|------|
-| **Web Application** | Next.js 14, React 18, TypeScript, Tailwind CSS | Online booking, admin dashboard, public queue display |
-| **Cloud Services** | Firebase Auth + Realtime Database | Real-time data sync, authentication, command queue |
-| **Kiosk Host** | Raspberry Pi 4, Python 3, customtkinter | Touchscreen GUI, serial communication, Firebase polling |
-| **Embedded Hardware** | ESP32, AS608 Fingerprint Sensor | Fingerprint enrollment, 1:N matching, template storage |
+| **Web App** | Next.js 14 + React 18 + TypeScript + Tailwind CSS + Firebase SDK | Online booking, admin dashboard, queue display, SMS notifications |
+| **Cloud** | Firebase Auth + Realtime Database | Auth, data store, real-time sync, command queue |
+| **Kiosk** | Raspberry Pi 4 + Python 3 + customtkinter + firebase-admin + pyserial | Touchscreen GUI, fingerprint ops, OTP enrollment, admin panel |
+| **Hardware** | ESP32 + AS608 Fingerprint Sensor (Arduino C++) | Fingerprint enrollment, 1:N matching, continuous monitoring |
 
-For detailed architecture documentation, see:
-- [System Architecture](docs/system-architecture.md) — Full architecture overview, deployment diagrams, security architecture
-- [Component Details](docs/components.md) — Deep dive into every component, its responsibilities, and interfaces
-- [Technology Stack](docs/tech-stack.md) — Complete inventory of all technologies, libraries, and dependencies
-- [Flow Diagrams](docs/flow-diagrams.md) — Sequence diagrams, flowcharts, and data flow visuals
-- [Hardware & Software Specs](docs/specifications.md) — Detailed hardware and software specifications
-- [Software Requirements](docs/software-requirements.md) — Functional and non-functional requirements (SRS)
+### Adviser Reference & Gap Analysis
+
+The adviser's reference design includes a **centralized Application Backend**, **Cloud Firestore**, **Twilio SMS**, and **Thermal Printer**. See the full comparison in [System Architecture](docs/system-architecture.md#c-gaps-adviser-reference-vs-actual-implementation).
 
 ---
 
-## Data Flow
+## Key Data Flow
 
-1. **Resident books appointment** via web app → writes to Firebase Realtime Database (RTDB)
-2. **RPi4 polls RTDB** `kiosk_commands` every 2 seconds via firebase-admin
-3. **ESP32 processes fingerprints** → RPi4 writes result back to RTDB
-4. **Web app displays** real-time updates via RTDB listeners
+```
+Booking:     Browser → runTransaction(slot_bookings) → set(appointment) → SMS confirm
+Enrollment:  Browser → OTP displayed → Kiosk OTP entry → verify → ESP32 enroll → RTDB update
+Check-in:    Kiosk → FP_VERIFY → ESP32 1:N match → lookup uid → update status → RTDB listener
+Reminders:   Cron script → Firebase Admin SDK → check 25-35min window → Semaphore SMS
+Monitor:     ESP32 monitor mode → 500ms poll → FP_MATCH/FP_NO_MATCH events
 
 ---
 
@@ -130,6 +145,7 @@ smart-appointment-scheduling-kiosk/
 | Firebase SDK | ^10.13.0 | Auth + RTDB |
 | date-fns | ^3.6.0 | Date formatting |
 | lucide-react | ^0.439.0 | Icon library |
+| Semaphore SMS | — | Philippine SMS gateway (send-otp, verify-otp, booking-confirmation, reminder, send) |
 
 ### Raspberry Pi 4 Kiosk
 | Technology | Version | Purpose |
